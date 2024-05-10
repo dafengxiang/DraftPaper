@@ -2,23 +2,44 @@
  * @Description: 草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 18:50:23
- * @LastEditTime: 2024-05-10 19:38:13
+ * @LastEditTime: 2024-05-10 21:22:58
  * @LastEditors: wangfengxiang
 -->
 <template>
-    <section class="m-draft-list">
-        <div class="draft-item" v-for="item in currentDraft.list" :key="item.pic"></div>
-        <input class="draft-item add" type="file" accept="image/*" @change="handleAdd" />
-    </section>
+    <ul class="m-draft-list">
+        <li
+            class="draft-item"
+            :class="{ selected: currentDraft.selectedIdx === i }"
+            v-for="({ pic }, i) in currentDraft?.list ?? []"
+            :style="`background-image: url(${pic});`"
+            :key="i"
+            @click="currentDraft.selectedIdx = i"
+        ></li>
+        <input type="file" accept="image/*" class="draft-item add" @change="handleImageUpload" />
+    </ul>
 </template>
 
 <script setup>
 import { useDrafts } from '../hooks/useDrafts'
 const { currentDraft } = useDrafts()
 
-const handleAdd = (e) => {
-    const file = e.target.files[0]
-    console.log('file: ', file)
+const handleImageUpload = (event) => {
+    const file = event.target.files[0]
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => {
+        const pic = reader.result
+        console.log('pic : ', pic)
+        if (!currentDraft.value?.list?.length) currentDraft.value.list = []
+        currentDraft.value.list.push({
+            pic,
+            top: 0,
+            left: 0,
+            opacity: 1,
+        })
+        currentDraft.value.selectedIdx = currentDraft.value.list.length - 1
+        console.log('currentDraft.value: ', currentDraft.value)
+    }
 }
 </script>
 
@@ -39,15 +60,20 @@ const handleAdd = (e) => {
         border-radius: 10px;
         margin-right: 4px;
         border: 1px solid #e6e6e6;
+        filter: grayscale(0.8);
         background: no-repeat 0 0 / cover;
+        &.selected {
+            filter: grayscale(0);
+            border-color: #ff9900;
+        }
 
         &.add {
-            position: relative;
             font-size: 0;
+            position: relative;
             &::after {
                 content: '';
-                .ab(0,0);
                 .square(100%);
+                .ab(0,0);
                 background: #333 url(../icons/add.png) no-repeat center/30px;
             }
         }

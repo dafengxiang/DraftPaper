@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-10 19:32:09
+ * @LastEditTime: 2024-05-10 21:35:22
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { watch, nextTick } from 'vue'
+import { watch } from 'vue'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
 
@@ -29,21 +29,24 @@ import ControlBox from './ControlBox.vue'
 import { useWindowInfo } from '../hooks/useWindowInfo'
 const { tabInfo, initWindowInfo } = useWindowInfo()
 initWindowInfo()
-setTimeout(() => {
-    console.log(' windowInfo: ', tabInfo.value)
-}, 1000)
 
 // 拾取
 import { usePick } from '../hooks/usePick'
 const { isPicking } = usePick()
-console.log(99, chrome.runtime.sendMessage)
 
 // 草稿状态
 import { useDrafts } from '../hooks/useDrafts'
-const { drafts, initDrafts, updateDraftsStorage } = useDrafts()
+const { currentDraft, initDrafts, updateDraftsStorage } = useDrafts()
 initDrafts()
 setInterval(() => {
-    watch(drafts, () => updateDraftsStorage())
+    watch(
+        currentDraft,
+        (cl) => {
+            console.log('cl: ', cl)
+            updateDraftsStorage()
+        },
+        { deep: true }
+    )
 }, 500)
 </script>
 

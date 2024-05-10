@@ -2,7 +2,7 @@
  * @Description:草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 16:33:15
- * @LastEditTime: 2024-05-10 19:28:58
+ * @LastEditTime: 2024-05-10 21:14:43
  * @LastEditors: wangfengxiang
  */
 
@@ -25,25 +25,27 @@ const { tabInfo, currentHost } = useWindowInfo()
 //     },
 // }
 
-const drafts = ref({}),
-    currentDraft = computed(() => drafts.value?.[currentHost?.value] ?? {})
+const drafts = {},
+    currentDraft = ref({})
 
 export function useDrafts() {
     const initDrafts = () =>
         draftsStorage.get((val) => {
-            if (val) drafts.value = val
+            if (val) drafts = val
             else
-                drafts.value = {
+                drafts = {
                     [currentHost.value]: {
-                        selectedIdx: 0,
+                        selectedIdx: 100,
                         list: [],
                     },
                 }
+            currentDraft.value = drafts[currentHost.value]
         })
 
     const updateDraftsStorage = () => {
+        drafts[currentHost.value] = currentDraft.value
         // 存储草稿
-        draftsStorage.set(drafts.value)
+        draftsStorage.set(drafts)
         // 通知页面更新
         tabInfo.value.id &&
             chrome.tabs.sendMessage(tabInfo.value.id, {
@@ -52,7 +54,6 @@ export function useDrafts() {
             })
     }
     return {
-        drafts,
         currentDraft,
         initDrafts,
         updateDraftsStorage,

@@ -2,28 +2,38 @@
  * @Description: 
  * @Author: wangfengxiang
  * @Date: 2024-05-10 15:36:57
- * @LastEditTime: 2024-05-10 15:38:47
+ * @LastEditTime: 2024-05-10 20:34:17
  * @LastEditors: wangfengxiang
 -->
 <template>
-    <section class="m-control-box">
-        <div class="item">
+    <ul class="m-control-box" v-if="draftData">
+        <li class="item">
             <span class="title">top(px):</span>
-            <input type="number" class="number" value="0" />
-        </div>
-        <div class="item">
+            <input type="number" class="number" v-model.trim="draftData.top" />
+        </li>
+        <li class="item">
             <span class="title">left(px):</span>
-            <input type="number" class="number" value="0" />
-        </div>
-        <div class="item">
+            <input type="number" class="number" v-model.trim="draftData.left" />
+        </li>
+        <li class="item">
             <span class="title">opacity:</span>
-            <input type="range" class="range" min="0" max="1" value="0" step="0.1" />
-        </div>
-    </section>
+            <input
+                type="range"
+                class="range"
+                min="0"
+                max="1"
+                step="0.1"
+                v-model.trim="draftData.opacity"
+            />
+        </li>
+    </ul>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed } from 'vue'
+import { useDrafts } from '../hooks/useDrafts'
+const { currentDraft } = useDrafts(),
+    draftData = computed(() => currentDraft.value?.list?.[currentDraft.value?.selectedIdx])
 </script>
 
 <style lang="less">
