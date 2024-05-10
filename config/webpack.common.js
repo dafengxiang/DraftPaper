@@ -1,6 +1,7 @@
 'use strict'
 
 const SizePlugin = require('size-plugin')
+const { VueLoaderPlugin } = require('vue-loader')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
@@ -16,6 +17,7 @@ const common = {
         path: PATHS.build,
         // the filename template for entry chunks
         filename: '[name].js',
+        publicPath: './',
     },
     devtool: 'source-map',
     stats: {
@@ -42,22 +44,18 @@ const common = {
                     },
                 ],
             },
-            // Check for images imported in .js files and
             {
                 test: /\.(png|jpe?g|gif)$/i,
-                use: [
-                    {
-                        loader: 'file-loader',
-                        options: {
-                            outputPath: 'images',
-                            name: '[name].[ext]',
-                        },
-                    },
-                ],
+                type: 'asset',
+            },
+            {
+                test: /\.vue$/,
+                loader: 'vue-loader',
             },
         ],
     },
     plugins: [
+        new VueLoaderPlugin(),
         // Print file sizes
         new SizePlugin(),
         // Copy static assets from `public` folder to `build` folder
