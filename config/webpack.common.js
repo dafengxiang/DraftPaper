@@ -1,6 +1,7 @@
 'use strict'
 
 const SizePlugin = require('size-plugin')
+const { DefinePlugin } = require('webpack')
 const { VueLoaderPlugin } = require('vue-loader')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const MiniCssExtractPlugin = require('mini-css-extract-plugin')
@@ -70,6 +71,11 @@ const common = {
         // Extract CSS into separate files
         new MiniCssExtractPlugin({
             filename: '[name].css',
+        }),
+        new DefinePlugin({
+            __VUE_OPTIONS_API__: false,
+            __VUE_PROD_DEVTOOLS__: false,
+            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
         }),
     ],
 }

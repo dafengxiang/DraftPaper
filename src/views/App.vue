@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-10 15:37:50
+ * @LastEditTime: 2024-05-10 19:32:09
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -14,23 +14,37 @@
             @click="isPicking = !isPicking"
         ></button>
         <!-- 草稿列表 -->
-        <section class="draft-list">
-            <div class="draft-item"></div>
-            <div class="draft-item"></div>
-            <div class="draft-item"></div>
-            <div class="draft-item add"></div>
-        </section>
+        <DraftList />
         <!-- 控制面板 -->
         <ControlBox />
     </div>
 </template>
 
 <script setup>
+import { watch, nextTick } from 'vue'
+import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
-import { usePick } from '../hooks/usePick'
-const { isPicking } = usePick()
+
+// 页面信息
+import { useWindowInfo } from '../hooks/useWindowInfo'
+const { tabInfo, initWindowInfo } = useWindowInfo()
+initWindowInfo()
+setTimeout(() => {
+    console.log(' windowInfo: ', tabInfo.value)
+}, 1000)
 
 // 拾取
+import { usePick } from '../hooks/usePick'
+const { isPicking } = usePick()
+console.log(99, chrome.runtime.sendMessage)
+
+// 草稿状态
+import { useDrafts } from '../hooks/useDrafts'
+const { drafts, initDrafts, updateDraftsStorage } = useDrafts()
+initDrafts()
+setInterval(() => {
+    watch(drafts, () => updateDraftsStorage())
+}, 500)
 </script>
 
 <style lang="less">
@@ -52,29 +66,6 @@ const { isPicking } = usePick()
 
         &.disabled {
             background-image: url('../icons/pick_disabled.png');
-        }
-    }
-
-    .draft-list {
-        width: 100%;
-        height: 177px;
-        overflow: hidden;
-        display: flex;
-        flex-wrap: no-wrap;
-        align-items: center;
-        margin: 20px 0 10px;
-
-        .draft-item {
-            flex-shrink: 0;
-            .size(100px, 177px);
-            border-radius: 10px;
-            margin-right: 4px;
-            border: 1px solid #e6e6e6;
-            background: no-repeat 0 0 / cover;
-
-            &.add {
-                background: url(../icons/add.png) no-repeat center/30px;
-            }
         }
     }
 }
