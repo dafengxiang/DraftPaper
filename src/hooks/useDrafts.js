@@ -2,11 +2,11 @@
  * @Description:草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 16:33:15
- * @LastEditTime: 2024-05-10 21:14:43
+ * @LastEditTime: 2024-05-11 10:19:36
  * @LastEditors: wangfengxiang
  */
 
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { draftsStorage } from '../utils/draftsStorage'
 import { useWindowInfo } from './useWindowInfo'
 const { tabInfo, currentHost } = useWindowInfo()
@@ -25,20 +25,21 @@ const { tabInfo, currentHost } = useWindowInfo()
 //     },
 // }
 
-const drafts = {},
+let drafts = {},
     currentDraft = ref({})
 
 export function useDrafts() {
     const initDrafts = () =>
         draftsStorage.get((val) => {
-            if (val) drafts = val
-            else
-                drafts = {
-                    [currentHost.value]: {
-                        selectedIdx: 100,
-                        list: [],
-                    },
-                }
+            console.log('val: ', val)
+            drafts = val ?? {}
+
+            drafts = {
+                [currentHost.value]: {
+                    selectedIdx: 100,
+                    list: [],
+                },
+            }
             currentDraft.value = drafts[currentHost.value]
         })
 

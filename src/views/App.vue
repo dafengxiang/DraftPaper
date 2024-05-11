@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-10 21:35:22
+ * @LastEditTime: 2024-05-11 11:01:09
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { onUnmounted, watch } from 'vue'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
 
@@ -38,7 +38,8 @@ const { isPicking } = usePick()
 import { useDrafts } from '../hooks/useDrafts'
 const { currentDraft, initDrafts, updateDraftsStorage } = useDrafts()
 initDrafts()
-setInterval(() => {
+
+setTimeout(() => {
     watch(
         currentDraft,
         (cl) => {
