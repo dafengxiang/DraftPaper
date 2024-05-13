@@ -1,38 +1,25 @@
+/*
+ * @Description:
+ * @Author: wangfengxiang
+ * @Date: 2024-05-11 11:34:20
+ * @LastEditTime: 2024-05-13 16:17:34
+ * @LastEditors: wangfengxiang
+ */
 'use strict'
 
-// Content script file will run in the context of web page.
-// With content script you can manipulate the web pages using
-// Document Object Model (DOM).
-// You can also pass information to the parent extension.
-
-// We execute this script by making an entry in manifest.json file
-// under `content_scripts` property
-
-// For more information on Content Scripts,
-// See https://developer.chrome.com/extensions/content_scripts
-
-// Log `title` of current active web page
-const pageTitle = document.head.getElementsByTagName('title')[0].innerHTML
-console.log(
-    `Page title is: '${pageTitle}' - evaluated by Chrome extension's 'contentScript.js' file`
-)
-
-// Communicate with background file by sending a message
+const dbKey = new URL(location.href).host + new URL(location.href).pathname
 chrome.runtime.sendMessage(
     {
-        type: 'GREETINGS',
-        payload: {
-            message: 'Hello, my name is Con. I am from ContentScript.',
-        },
+        type: 'URL_CHANGE',
+        payload: { dbKey },
     },
     (response) => {
-        console.log(response.message)
+        console.log(response)
     }
 )
 
-// Listen for message
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'COUNT') {
+    if (request.type === 'UPDATE_DRAFTS') {
         console.log(`Current count is ${request.payload.count}`)
     }
 

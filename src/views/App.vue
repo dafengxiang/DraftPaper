@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-11 11:01:09
+ * @LastEditTime: 2024-05-13 16:34:41
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -21,34 +21,33 @@
 </template>
 
 <script setup>
-import { onUnmounted, watch } from 'vue'
+import { watch, onUnmounted } from 'vue'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
 
-// 页面信息
-import { useWindowInfo } from '../hooks/useWindowInfo'
-const { tabInfo, initWindowInfo } = useWindowInfo()
-initWindowInfo()
+console.log(' window.$currentTab: ', window.$currentTab)
+console.log('$currentUrl.path: ', window.$currentUrl)
+
+// 草稿数据
+import { openDB, closeDB } from '../utils/database'
+import { useDrafts } from '../hooks/useDrafts'
+const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
+watch(draftsInfo, () => updateDraftsDB(), { deep: true })
+openDB().then(() => initDrafts())
+onUnmounted(closeDB)
 
 // 拾取
 import { usePick } from '../hooks/usePick'
 const { isPicking } = usePick()
 
-// 草稿状态
-import { useDrafts } from '../hooks/useDrafts'
-const { currentDraft, initDrafts, updateDraftsStorage } = useDrafts()
-initDrafts()
-
-setTimeout(() => {
-    watch(
-        currentDraft,
-        (cl) => {
-            console.log('cl: ', cl)
-            updateDraftsStorage()
-        },
-        { deep: true }
-    )
-}, 500)
+// 链接改变关闭popup
+chrome.runtime.onMessage.addListener((request) => {
+    if (request.type === 'URL_CHANGE') {
+        request.payload.dbKey !== window.$currentUrl.host + window.$currentUrl.pathname &&
+            window.close()
+    }
+    return true
+})
 </script>
 
 <style lang="less">

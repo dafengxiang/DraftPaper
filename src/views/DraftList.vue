@@ -2,18 +2,18 @@
  * @Description: 草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 18:50:23
- * @LastEditTime: 2024-05-10 21:22:58
+ * @LastEditTime: 2024-05-13 14:46:26
  * @LastEditors: wangfengxiang
 -->
 <template>
     <ul class="m-draft-list">
         <li
             class="draft-item"
-            :class="{ selected: currentDraft.selectedIdx === i }"
-            v-for="({ pic }, i) in currentDraft?.list ?? []"
+            :class="{ selected: draftsInfo.selectedIdx === i }"
+            v-for="({ pic }, i) in draftsInfo?.list ?? []"
             :style="`background-image: url(${pic});`"
             :key="i"
-            @click="currentDraft.selectedIdx = i"
+            @click="draftsInfo.selectedIdx = i"
         ></li>
         <input type="file" accept="image/*" class="draft-item add" @change="handleImageUpload" />
     </ul>
@@ -21,7 +21,7 @@
 
 <script setup>
 import { useDrafts } from '../hooks/useDrafts'
-const { currentDraft } = useDrafts()
+const { draftsInfo } = useDrafts()
 
 const handleImageUpload = (event) => {
     const file = event.target.files[0]
@@ -29,16 +29,15 @@ const handleImageUpload = (event) => {
     reader.readAsDataURL(file)
     reader.onload = () => {
         const pic = reader.result
-        console.log('pic : ', pic)
-        if (!currentDraft.value?.list?.length) currentDraft.value.list = []
-        currentDraft.value.list.push({
+        if (!draftsInfo.value?.list?.length) draftsInfo.value.list = []
+        draftsInfo.value.list.push({
             pic,
             top: 0,
             left: 0,
             opacity: 1,
         })
-        currentDraft.value.selectedIdx = currentDraft.value.list.length - 1
-        console.log('currentDraft.value: ', currentDraft.value)
+        draftsInfo.value.selectedIdx = draftsInfo.value.list.length - 1
+        console.log('draftsInfo.value: ', draftsInfo.value)
     }
 }
 </script>

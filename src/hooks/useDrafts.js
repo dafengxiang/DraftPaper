@@ -2,18 +2,16 @@
  * @Description:草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 16:33:15
- * @LastEditTime: 2024-05-11 10:19:36
+ * @LastEditTime: 2024-05-13 16:30:02
  * @LastEditors: wangfengxiang
  */
 
 import { ref } from 'vue'
-import { draftsStorage } from '../utils/draftsStorage'
-import { useWindowInfo } from './useWindowInfo'
-const { tabInfo, currentHost } = useWindowInfo()
+import { getDataByKey, addData, updateDB } from '../utils/database'
 
-// drafts = {
-//     'test.m.iqiyi.com': {
-//         selectedIdx: 0,
+// draftsInfo = {
+//         selectedIdx: 0, 选中的草稿下标
+//         isCanPick: false, 选中的草稿下标
 //         list: [
 //             {
 //                 pic: '',
@@ -23,40 +21,37 @@ const { tabInfo, currentHost } = useWindowInfo()
 //             },
 //         ],
 //     },
-// }
 
-let drafts = {},
-    currentDraft = ref({})
+const draftsInfo = ref({}),
+    { host, pathname } = window.$currentUrl,
+    dbKey = host + pathname
+let hasDBInfo = false
 
 export function useDrafts() {
-    const initDrafts = () =>
-        draftsStorage.get((val) => {
-            console.log('val: ', val)
-            drafts = val ?? {}
+    const initDrafts = async () => {
+        const res = await getDataByKey(dbKey)
+        hasDBInfo = !!res
+        draftsInfo.value = res
+            ? JSON.parse(res.val)
+            : {
+                  selectedIdx: 1000,
+                  isCanPick: false,
+                  list: [],
+              }
+    }
 
-            drafts = {
-                [currentHost.value]: {
-                    selectedIdx: 100,
-                    list: [],
-                },
-            }
-            currentDraft.value = drafts[currentHost.value]
-        })
-
-    const updateDraftsStorage = () => {
-        drafts[currentHost.value] = currentDraft.value
-        // 存储草稿
-        draftsStorage.set(drafts)
-        // 通知页面更新
-        tabInfo.value.id &&
-            chrome.tabs.sendMessage(tabInfo.value.id, {
-                type: 'updateDrafts',
-                payload: { drafts },
-            })
+    const updateDraftsDB = async () => {
+        const data = {
+            url_path: dbKey,
+            val: JSON.stringify(draftsInfo.value),
+        }
+        // 无数据时为数据库初始数据
+        const _ = (await hasDBInfo) ? updateDB(data) : addData(data)
+        hasDBInfo = true
     }
     return {
-        currentDraft,
+        draftsInfo,
         initDrafts,
-        updateDraftsStorage,
+        updateDraftsDB,
     }
 }
