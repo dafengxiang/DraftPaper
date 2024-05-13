@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 19:01:00
+ * @LastEditTime: 2024-05-13 19:04:59
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -24,7 +24,10 @@ let draftImgDom = document.createElement('img'),
     drawDraft = (draftsInfoJSON) => {
         if (!draftsInfoJSON) return
         const draftsInfo = JSON.parse(draftsInfoJSON),
-            { pic, top, left, opacity } = draftsInfo.list[draftsInfo.selectedIdx]
+            { pic, top, left, opacity } = draftsInfo?.list?.[draftsInfo?.selectedIdx] ?? {}
+
+        if (!pic) return document.body.removeChild(draftImgDom)
+
         draftImgDom.setAttribute('src', pic)
         draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
         document.body.appendChild(draftImgDom)
