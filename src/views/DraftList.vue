@@ -2,7 +2,7 @@
  * @Description: 草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 18:50:23
- * @LastEditTime: 2024-05-13 17:19:24
+ * @LastEditTime: 2024-05-13 18:08:00
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -14,31 +14,40 @@
             :style="`background-image: url(${pic});`"
             :key="i"
             @click="draftsInfo.selectedIdx = i"
-        ></li>
+        >
+            <button class="delete-btn" @click.stop="deleteDraft(i)"></button>
+        </li>
         <input type="file" accept="image/*" class="draft-item add" @change="handleImageUpload" />
     </ul>
 </template>
 
 <script setup>
 import { useDrafts } from '../hooks/useDrafts'
-const { draftsInfo } = useDrafts()
-
-const handleImageUpload = (event) => {
-    const file = event.target.files[0],
-        reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = () => {
-        const pic = reader.result
-        if (!draftsInfo.value?.list?.length) draftsInfo.value.list = []
-        draftsInfo.value.list.push({
-            pic,
-            top: 0,
-            left: 0,
-            opacity: 1,
-        })
-        draftsInfo.value.selectedIdx = draftsInfo.value.list.length - 1
+const { draftsInfo } = useDrafts(),
+    handleImageUpload = (event) => {
+        const file = event.target.files[0],
+            reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => {
+            const pic = reader.result
+            if (!draftsInfo.value?.list?.length) draftsInfo.value.list = []
+            draftsInfo.value.list.push({
+                pic,
+                top: 0,
+                left: 0,
+                opacity: 1,
+            })
+            draftsInfo.value.selectedIdx = draftsInfo.value.list.length - 1
+        }
+    },
+    deleteDraft = (idx) => {
+        draftsInfo.value.list.splice(idx, 1)
+        if (
+            draftsInfo.value.selectedIdx >= idx ||
+            (draftsInfo.value.selectedIdx === idx && idx > 0)
+        )
+            draftsInfo.value.selectedIdx -= 1
     }
-}
 </script>
 
 <style lang="less" scoped>
@@ -60,6 +69,11 @@ const handleImageUpload = (event) => {
         border: 1px solid #e6e6e6;
         filter: grayscale(0.8);
         background: no-repeat 0 0 / cover;
+        .delete-btn {
+            .square(20px);
+            .ab(6px,70px);
+            background: url(../icons/delete.png) no-repeat center/20px;
+        }
         &.selected {
             filter: grayscale(0);
             border-color: #ff9900;
