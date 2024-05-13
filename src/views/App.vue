@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-13 17:19:02
+ * @LastEditTime: 2024-05-13 18:25:50
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -38,11 +38,11 @@ watch(
             {
                 type: 'UPDATE_DRAFTS',
                 payload: {
-                    count: JSON.stringify(draftsInfo.value),
+                    draftsInfo: JSON.stringify(draftsInfo.value),
                 },
             },
             (response) => {
-                console.log('Current count value passed to contentScript file')
+                console.log('draftsInfo updatated')
             }
         )
     },

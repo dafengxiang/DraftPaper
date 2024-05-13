@@ -2,24 +2,32 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 17:02:28
+ * @LastEditTime: 2024-05-13 18:34:40
  * @LastEditors: wangfengxiang
  */
 'use strict'
 
-// const dbKey = new URL(location.href).host + new URL(location.href).pathname
-// chrome.runtime.sendMessage(
-//     {
-//         type: 'URL_CHANGE',
-//         payload: { dbKey },
-//     },
-//     (response) => {
-//         console.log(response)
-//     }
-// )
+// 路径改变强制关闭插件
+const dbKey = new URL(location.href).host + new URL(location.href).pathname
+chrome.runtime.sendMessage(
+    {
+        type: 'URL_CHANGE',
+        payload: { dbKey },
+    },
+    (response) => {
+        console.log(response)
+    }
+)
+
+// 监听消息，绘制草稿
+let draftImgDom = document.createElement('img')
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'UPDATE_DRAFTS') {
-        console.log(`DRAFTS is ${request.payload.count}`)
+        const draftsInfo = JSON.parse(request.payload.draftsInfo),
+            { pic, top, left, opacity } = draftsInfo.list[draftsInfo.selectedIdx]
+        draftImgDom.setAttribute('src', pic)
+        draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
+        document.body.appendChild(draftImgDom)
     }
 
     // Send an empty response
