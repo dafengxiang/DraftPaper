@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 16:39:53
+ * @LastEditTime: 2024-05-13 17:02:19
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -17,16 +17,4 @@ import { createApp } from 'vue'
     console.log('App: ', App)
 
     createApp(App).mount('#app')
-
-    // chrome.runtime.sendMessage(
-    //     {
-    //         type: 'UPDATE_DRAFTS',
-    //         payload: {
-    //             message: '90909090',
-    //         },
-    //     },
-    //     (response) => {
-    //         console.log(1, response)
-    //     }
-    // )
 })()

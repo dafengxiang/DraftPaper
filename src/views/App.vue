@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-13 16:34:41
+ * @LastEditTime: 2024-05-13 17:03:07
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -32,7 +32,25 @@ console.log('$currentUrl.path: ', window.$currentUrl)
 import { openDB, closeDB } from '../utils/database'
 import { useDrafts } from '../hooks/useDrafts'
 const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
-watch(draftsInfo, () => updateDraftsDB(), { deep: true })
+watch(
+    draftsInfo,
+    () => {
+        updateDraftsDB()
+        chrome.tabs.sendMessage(
+            window.$currentTab.id,
+            {
+                type: 'UPDATE_DRAFTS',
+                payload: {
+                    count: JSON.stringify(draftsInfo.value),
+                },
+            },
+            (response) => {
+                console.log('Current count value passed to contentScript file')
+            }
+        )
+    },
+    { deep: true }
+)
 openDB().then(() => initDrafts())
 onUnmounted(closeDB)
 

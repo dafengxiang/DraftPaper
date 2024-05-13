@@ -2,25 +2,24 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 16:17:34
+ * @LastEditTime: 2024-05-13 17:02:28
  * @LastEditors: wangfengxiang
  */
 'use strict'
 
-const dbKey = new URL(location.href).host + new URL(location.href).pathname
-chrome.runtime.sendMessage(
-    {
-        type: 'URL_CHANGE',
-        payload: { dbKey },
-    },
-    (response) => {
-        console.log(response)
-    }
-)
-
+// const dbKey = new URL(location.href).host + new URL(location.href).pathname
+// chrome.runtime.sendMessage(
+//     {
+//         type: 'URL_CHANGE',
+//         payload: { dbKey },
+//     },
+//     (response) => {
+//         console.log(response)
+//     }
+// )
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'UPDATE_DRAFTS') {
-        console.log(`Current count is ${request.payload.count}`)
+        console.log(`DRAFTS is ${request.payload.count}`)
     }
 
     // Send an empty response
