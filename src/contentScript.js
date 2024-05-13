@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 18:34:40
+ * @LastEditTime: 2024-05-13 19:01:00
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -20,14 +20,24 @@ chrome.runtime.sendMessage(
 )
 
 // 监听消息，绘制草稿
-let draftImgDom = document.createElement('img')
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'UPDATE_DRAFTS') {
-        const draftsInfo = JSON.parse(request.payload.draftsInfo),
+let draftImgDom = document.createElement('img'),
+    drawDraft = (draftsInfoJSON) => {
+        if (!draftsInfoJSON) return
+        const draftsInfo = JSON.parse(draftsInfoJSON),
             { pic, top, left, opacity } = draftsInfo.list[draftsInfo.selectedIdx]
         draftImgDom.setAttribute('src', pic)
         draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
         document.body.appendChild(draftImgDom)
+    }
+
+const draftsInfoJSON = sessionStorage.getItem('draftsInfo')
+sessionStorage.getItem('dbKey') === dbKey && drawDraft(draftsInfoJSON)
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'UPDATE_DRAFTS') {
+        sessionStorage.setItem('dbKey', dbKey)
+        sessionStorage.setItem('draftsInfo', request.payload.draftsInfo)
+        drawDraft(request.payload.draftsInfo)
     }
 
     // Send an empty response

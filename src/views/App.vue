@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-13 18:25:50
+ * @LastEditTime: 2024-05-13 18:58:44
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -28,7 +28,8 @@ import ControlBox from './ControlBox.vue'
 // 草稿数据
 import { openDB, closeDB } from '../utils/database'
 import { useDrafts } from '../hooks/useDrafts'
-const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
+const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts(),
+    { host, pathname } = window.$currentUrl
 watch(
     draftsInfo,
     () => {
@@ -38,6 +39,7 @@ watch(
             {
                 type: 'UPDATE_DRAFTS',
                 payload: {
+                    dbKey: host + pathname,
                     draftsInfo: JSON.stringify(draftsInfo.value),
                 },
             },
