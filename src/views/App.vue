@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-13 17:03:07
+ * @LastEditTime: 2024-05-13 17:19:02
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -24,9 +24,6 @@
 import { watch, onUnmounted } from 'vue'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
-
-console.log(' window.$currentTab: ', window.$currentTab)
-console.log('$currentUrl.path: ', window.$currentUrl)
 
 // 草稿数据
 import { openDB, closeDB } from '../utils/database'

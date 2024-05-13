@@ -2,7 +2,7 @@
  * @Description: 草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 18:50:23
- * @LastEditTime: 2024-05-13 14:46:26
+ * @LastEditTime: 2024-05-13 17:19:24
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -24,8 +24,8 @@ import { useDrafts } from '../hooks/useDrafts'
 const { draftsInfo } = useDrafts()
 
 const handleImageUpload = (event) => {
-    const file = event.target.files[0]
-    const reader = new FileReader()
+    const file = event.target.files[0],
+        reader = new FileReader()
     reader.readAsDataURL(file)
     reader.onload = () => {
         const pic = reader.result
@@ -37,7 +37,6 @@ const handleImageUpload = (event) => {
             opacity: 1,
         })
         draftsInfo.value.selectedIdx = draftsInfo.value.list.length - 1
-        console.log('draftsInfo.value: ', draftsInfo.value)
     }
 }
 </script>
