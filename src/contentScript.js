@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-14 17:02:35
+ * @LastEditTime: 2024-05-14 18:25:54
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -51,6 +51,8 @@ const draftStyleDom = document.createElement('style')
 draftStyleDom.innerHTML = `
 .draft-drag-border {
     box-shadow: 0 0 0 2px #f00 !important;
+}
+.draft-drag-position {
     transform: translate(var(--d-dragX,0px), var(--d-dragY,0px)) !important;
 }
 `
@@ -63,7 +65,7 @@ let selectedElement = null,
 document.head.appendChild(draftStyleDom)
 let input = document.createElement('input')
 input.setAttribute('readonly', 'readonly')
-input.setAttribute('style', 'width:0;height:0;opacity:0;pointer-events:none;')
+input.setAttribute('style', 'width:1px;height:1px;opacity:0;pointer-events:none;')
 document.body.appendChild(input)
 
 function handleElementDrag(isCanDrag = false) {
@@ -87,7 +89,7 @@ function handleClick(e) {
 
     selectedElement = e.target
 
-    selectedElement.classList.add('draft-drag-border')
+    selectedElement.classList.add('draft-drag-border', 'draft-drag-position')
     selectedElement.addEventListener('touchstart', handleTouchStart, true)
     selectedElement.addEventListener('touchmove', handleTouchMove, true)
     selectedElement.addEventListener('touchend', handleTouchEnd, true)
@@ -113,7 +115,6 @@ function handleTouchMove(e) {
     currentClientY = clientY
 }
 function handleTouchEnd(e) {
-    console.log('e.touches: ', e.touches)
     const template = '.ab($ypx, $xpx);'
     const x = parseInt((currentClientX - selectedClientX) / widthRatio),
         y = parseInt((currentClientY - selectedClientY) / widthRatio),
@@ -122,7 +123,11 @@ function handleTouchEnd(e) {
     input.select()
     if (document.execCommand('copy')) {
         document.execCommand('copy')
-        console.log(`复制成功: ${copyRes}`)
+        const classNames = e?.target?.className ?? ''
+
+        console.info(
+            `${classNames.replace(/draft-drag-position|draft-drag-border/g, '')}: ${copyRes}`
+        )
     }
 }
 
