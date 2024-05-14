@@ -14,4 +14,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })
         return true
     }
+    if (request.type === 'URL_CHANGE') {
+        sendResponse('background received url change')
+    }
 })
