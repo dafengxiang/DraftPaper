@@ -2,7 +2,7 @@
  * @Description: popup弹窗主文件
  * @Author: wangfengxiang
  * @Date: 2024-05-10 14:26:24
- * @LastEditTime: 2024-05-13 18:58:44
+ * @LastEditTime: 2024-05-14 16:37:24
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -10,8 +10,8 @@
         <h3 class="title">hi,前端稿纸</h3>
         <button
             class="d-handle-btn"
-            :class="{ disabled: !isPicking }"
-            @click="isPicking = !isPicking"
+            :class="{ disabled: !draftsInfo.isCanPick }"
+            @click="draftsInfo.isCanPick = !draftsInfo.isCanPick"
         ></button>
         <!-- 草稿列表 -->
         <DraftList />
@@ -52,10 +52,6 @@ watch(
 )
 openDB().then(() => initDrafts())
 onUnmounted(closeDB)
-
-// 拾取
-import { usePick } from '../hooks/usePick'
-const { isPicking } = usePick()
 
 // 链接改变关闭popup
 chrome.runtime.onMessage.addListener((request) => {
