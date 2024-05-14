@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-13 19:07:14
+ * @LastEditTime: 2024-05-14 10:21:26
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -19,32 +19,32 @@ chrome.runtime.sendMessage(
     }
 )
 
-// 监听消息，绘制草稿
-let draftImgDom = document.createElement('img'),
-    drawDraft = (draftsInfoJSON) => {
-        if (!draftsInfoJSON) return
-        const draftsInfo = JSON.parse(draftsInfoJSON),
-            { pic, top, left, opacity } = draftsInfo?.list?.[draftsInfo?.selectedIdx] ?? {}
+// 绘制草稿
+let draftImgDom = document.createElement('img')
+const drawDraft = (draftsInfoJSON) => {
+    if (!draftsInfoJSON) return
+    const draftsInfo = JSON.parse(draftsInfoJSON),
+        { pic, top, left, opacity } = draftsInfo?.list?.[draftsInfo?.selectedIdx] ?? {}
 
-        if (!pic) return
+    if (!pic) return
 
-        draftImgDom.setAttribute('src', pic)
-        draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
-        document.body.appendChild(draftImgDom)
-    }
+    draftImgDom.setAttribute('src', pic)
+    draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
+    document.body.appendChild(draftImgDom)
+}
 
-const draftsInfoJSON = sessionStorage.getItem('draftsInfo')
-sessionStorage.getItem('dbKey') === dbKey && drawDraft(draftsInfoJSON)
+// 页面进入，发送请求获取草稿信息
+chrome.runtime.sendMessage(
+    {
+        type: 'GET_DRAFTS',
+        payload: { dbKey },
+    },
+    (response) => drawDraft(response?.draftsInfo)
+)
 
+// 监听消息，更新草稿
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'UPDATE_DRAFTS') {
-        sessionStorage.setItem('dbKey', dbKey)
-        sessionStorage.setItem('draftsInfo', request.payload.draftsInfo)
-        drawDraft(request.payload.draftsInfo)
-    }
-
-    // Send an empty response
-    // See https://github.com/mozilla/webextension-polyfill/issues/130#issuecomment-531531890
+    if (request.type === 'UPDATE_DRAFTS') drawDraft(request.payload.draftsInfo)
     sendResponse({})
     return true
 })

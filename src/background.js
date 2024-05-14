@@ -1,21 +1,17 @@
 'use strict'
 
-// With background scripts you can communicate with popup
-// and contentScript files.
-// For more information on background script,
-// See https://developer.chrome.com/extensions/background_pages
+import { openDB, getDataByKey } from './utils/database'
 
+console.log('draft extension background script is running')
+
+// 监听获取草稿信息请求
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'GREETINGS') {
-        const message = `Hi ${
-            sender.tab ? 'Con' : 'Pop'
-        }, my name is Bac. I am from Background. It's great to hear from you.`
-
-        // Log message coming from the `request` parameter
-        console.log(request.payload.message)
-        // Send a response message
-        sendResponse({
-            message,
+    if (request.type === 'GET_DRAFTS') {
+        openDB(true).then(async () => {
+            const data = await getDataByKey(request.payload.dbKey),
+                { val: draftsInfo = '' } = data ?? {}
+            sendResponse({ draftsInfo })
         })
+        return true
     }
 })

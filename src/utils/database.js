@@ -7,10 +7,10 @@ let db // 数据库对象
  * 封装的方法以及用法
  * 打开数据库
  */
-export function openDB(version = 1) {
+export function openDB(fromSw = false, version = 1) {
     return new Promise((resolve, reject) => {
-        const indexedDB = window.indexedDB,
-            request = indexedDB.open(dbName, version)
+        const idxDB = fromSw ? indexedDB : window.indexedDB,
+            request = idxDB.open(dbName, version)
 
         request.onsuccess = function (event) {
             db = event.target.result // 数据库对象
