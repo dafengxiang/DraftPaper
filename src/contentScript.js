@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-14 17:02:35
+ * @LastEditTime: 2024-05-14 17:36:55
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -68,9 +68,9 @@ document.body.appendChild(input)
 
 function handleElementDrag(isCanDrag = false) {
     if (isCanDrag) {
-        document.addEventListener('click', handleClick, true)
+        document.addEventListener('click', handleClick)
     } else {
-        document.removeEventListener('click', handleClick, true)
+        document.removeEventListener('click', handleClick)
     }
 }
 
