@@ -2,11 +2,15 @@
  * @Description: 
  * @Author: wangfengxiang
  * @Date: 2024-05-10 15:36:57
- * @LastEditTime: 2024-05-13 17:19:13
+ * @LastEditTime: 2024-05-14 10:24:58
  * @LastEditors: wangfengxiang
 -->
 <template>
     <ul class="m-control-box" v-if="currentDraft">
+        <li class="item">
+            <span class="title">width(px):</span>
+            <input type="number" class="number" v-model.trim="currentDraft.width" />
+        </li>
         <li class="item">
             <span class="title">top(px):</span>
             <input type="number" class="number" v-model.trim="currentDraft.top" />

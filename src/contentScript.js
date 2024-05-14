@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-14 10:21:26
+ * @LastEditTime: 2024-05-14 10:59:56
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -20,18 +20,33 @@ chrome.runtime.sendMessage(
 )
 
 // 绘制草稿
-let draftImgDom = document.createElement('img')
+let draftImgDom = document.createElement('img'),
+    draftInfoCache = '',
+    innerWidth = window.innerWidth,
+    widthRatio = 1
+
 const drawDraft = (draftsInfoJSON) => {
     if (!draftsInfoJSON) return
     const draftsInfo = JSON.parse(draftsInfoJSON),
-        { pic, top, left, opacity } = draftsInfo?.list?.[draftsInfo?.selectedIdx] ?? {}
+        { pic, width, top, left, opacity } = draftsInfo?.list?.[draftsInfo?.selectedIdx] ?? {}
 
     if (!pic) return
 
+    // 缓存草稿信息
+    draftInfoCache = draftsInfoJSON
+    widthRatio = innerWidth / width
+
     draftImgDom.setAttribute('src', pic)
-    draftImgDom.style = `width:100%;top:${top}px;left:${left}px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
+    draftImgDom.style = `width:100%;top:${top * widthRatio}px;left:${
+        left * widthRatio
+    }px;opacity:${opacity};position:absolute;z-index:999999;pointer-events:none;`
     document.body.appendChild(draftImgDom)
 }
+
+window.addEventListener('resize', (e) => {
+    innerWidth = e.currentTarget.innerWidth
+    drawDraft(draftInfoCache)
+})
 
 // 页面进入，发送请求获取草稿信息
 chrome.runtime.sendMessage(
