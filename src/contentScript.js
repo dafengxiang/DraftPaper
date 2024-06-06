@@ -2,7 +2,7 @@
  * @Description:
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-05-14 18:25:54
+ * @LastEditTime: 2024-06-06 11:36:09
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -65,7 +65,10 @@ let selectedElement = null,
 document.head.appendChild(draftStyleDom)
 let input = document.createElement('input')
 input.setAttribute('readonly', 'readonly')
-input.setAttribute('style', 'width:1px;height:1px;opacity:0;pointer-events:none;')
+input.setAttribute(
+    'style',
+    'width:1px;height:0px;opacity:0;position:absolute;top:0;left:0;pointer-events:none;'
+)
 document.body.appendChild(input)
 
 function handleElementDrag(isCanDrag = false) {
