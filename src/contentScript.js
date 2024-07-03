@@ -1,8 +1,8 @@
 /*
- * @Description:
+ * @Description: 页面插入代码
  * @Author: wangfengxiang
  * @Date: 2024-05-11 11:34:20
- * @LastEditTime: 2024-06-06 11:36:09
+ * @LastEditTime: 2024-07-03 17:26:44
  * @LastEditors: wangfengxiang
  */
 'use strict'
@@ -60,7 +60,8 @@ let selectedElement = null,
     selectedClientX = 0,
     selectedClientY = 0,
     currentClientX = 0,
-    currentClientY = 0
+    currentClientY = 0,
+    targetTemplateCode = ''
 
 document.head.appendChild(draftStyleDom)
 let input = document.createElement('input')
@@ -118,10 +119,9 @@ function handleTouchMove(e) {
     currentClientY = clientY
 }
 function handleTouchEnd(e) {
-    const template = '.ab($ypx, $xpx);'
     const x = parseInt((currentClientX - selectedClientX) / widthRatio),
         y = parseInt((currentClientY - selectedClientY) / widthRatio),
-        copyRes = template.replace(/\$y/gi, y).replace(/\$x/gi, x)
+        copyRes = targetTemplateCode.replace(/\{top\}/gi, y).replace(/\{left\}/gi, x)
     input.setAttribute('value', copyRes)
     input.select()
     if (document.execCommand('copy')) {
@@ -138,8 +138,10 @@ function handleDraft(draftsInfoJSON) {
     if (!draftsInfoJSON) return
     draftInfoCache = draftsInfoJSON
     const draftsInfo = JSON.parse(draftsInfoJSON),
-        { list = [], selectedIdx = 0, isCanPick = false } = draftsInfo ?? {},
+        { list = [], selectedIdx = 0, templateCode = '', isCanPick = false } = draftsInfo ?? {},
         draftInfo = list[selectedIdx] ?? {}
+
+    targetTemplateCode = templateCode || 'position: absolute; top: {top}px; left: {left}px;'
     if (draftInfo.pic) drawDraft(draftInfo)
     handleElementDrag(isCanPick)
 }
