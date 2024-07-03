@@ -2,7 +2,7 @@
  * @Description:草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 16:33:15
- * @LastEditTime: 2024-05-13 16:30:02
+ * @LastEditTime: 2024-07-03 17:00:51
  * @LastEditors: wangfengxiang
  */
 
@@ -36,6 +36,7 @@ export function useDrafts() {
             : {
                   selectedIdx: 1000,
                   isCanPick: false,
+                  templateCode: '',
                   list: [],
               }
     }
