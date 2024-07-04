@@ -8,10 +8,7 @@ WEB 前端开发者可以通过该插件将设计稿图片上传到开发预览�
 
 -   打开[**chrome 应用详情页**](https://chromewebstore.google.com/detail/draft/amlbbbgcijmiooecobhkjblcdkjldmdk?hl=zh-CN&utm_source=ext_sidebar)
 -   点击 `添加至 Chrome` 按钮；
--   打开 `chrome 扩展程序` 页面，勾选 `开发者模式`；
 -   刷新页面，点击 `draft_paper` 图标，打开插件页面；
-    <img src="//pic1.iqiyipic.com/lequ/20240704/2b147afa8f554604bef1de682b0a831a.jpg" width="640" style="display: block;
-    margin: 20px 0;">
 
 ## 使用
 
