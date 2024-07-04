@@ -2,7 +2,7 @@
  * @Description: 草稿列表
  * @Author: wangfengxiang
  * @Date: 2024-05-10 18:50:23
- * @LastEditTime: 2024-05-14 11:01:22
+ * @LastEditTime: 2024-07-04 15:19:59
  * @LastEditors: wangfengxiang
 -->
 <template>
@@ -33,7 +33,7 @@ const { draftsInfo } = useDrafts(),
             if (!draftsInfo.value?.list?.length) draftsInfo.value.list = []
             draftsInfo.value.list.push({
                 pic,
-                width: 375,
+                width: 750,
                 top: 0,
                 left: 0,
                 opacity: 1,
