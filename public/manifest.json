@@ -15,10 +15,7 @@
     "default_title": "draft_paper",
     "default_popup": "popup.html"
   },
-  "permissions": [
-    "tabs",
-    "storage"
-  ],
+  "permissions": ["activeTab"],
   "content_scripts": [
     {
       "matches": [
