@@ -1,3 +1,11 @@
+<!--
+ * @Description: 前端草稿纸，chrome 插件
+ * @Author: wangfengxiang
+ * @Date: 2024-05-11 11:34:20
+ * @LastEditTime: 2024-07-06 17:31:49
+ * @LastEditors: wangfengxiang
+-->
+
 # <img src="public/icons/icon_48.png" width="40" align="left" style="margin-right: 10px;"> DraftPaper
 
 #### 前端草稿纸，chrome 插件
@@ -6,7 +14,7 @@ WEB 前端开发者可以通过该插件将设计稿图片上传到开发预览�
 
 ## 安装
 
--   打开[**chrome 应用详情页**](https://chromewebstore.google.com/detail/draft/amlbbbgcijmiooecobhkjblcdkjldmdk?hl=zh-CN&utm_source=ext_sidebar)
+-   打开[**chrome 应用详情页**](https://chromewebstore.google.com/detail/draftpaper/pjaiiaekjjpapkjphhabicdjpblmlbdd?hl=zh-CN&utm_source=ext_sidebar)
 -   点击 `添加至 Chrome` 按钮；
 -   刷新页面，点击 `draft_paper` 图标，打开插件页面；
 
