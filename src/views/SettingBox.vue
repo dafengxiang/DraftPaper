@@ -26,8 +26,7 @@
     </section>
 </template>
 
-<script setup>
-import { ref } from 'vue'
+<script setup scoped>
 import { useDrafts } from '../hooks/useDrafts'
 const { draftsInfo } = useDrafts()
 </script>

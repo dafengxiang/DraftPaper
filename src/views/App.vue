@@ -7,7 +7,7 @@
 -->
 <template>
     <div class="m-extension-popup">
-        <h3 class="title">hi,前端稿纸</h3>
+        <h3 class="title">前端稿纸</h3>
         <button
             class="d-handle-btn"
             :class="{ disabled: !draftsInfo.isCanPick }"
@@ -75,7 +75,7 @@ chrome.runtime.onMessage.addListener((request) => {
 })
 </script>
 
-<style lang="less">
+<style lang="less" scoped>
 @import '../mixin.less';
 .m-extension-popup {
     height: 100%;
