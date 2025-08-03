@@ -76,12 +76,20 @@ const errorMessage = ref('')
 const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
 
 /**
- * 发送草稿更新消息到内容脚本
+ * 发送草稿更新消息到内容脚本（带重试机制）
  */
 const sendDraftsUpdate = debounce(async () => {
   try {
     if (!window.$currentTab?.id || !window.$currentUrl) {
       throw new Error('当前标签页信息不可用')
+    }
+
+    // 检查标签页状态
+    const tab = await chrome.tabs.get(window.$currentTab.id)
+    if (!tab || tab.status !== 'complete') {
+      // eslint-disable-next-line no-console
+      console.log('标签页尚未完全加载，跳过消息发送')
+      return
     }
 
     const message: ChromeMessage = {
@@ -92,18 +100,62 @@ const sendDraftsUpdate = debounce(async () => {
       },
     }
 
-    chrome.tabs.sendMessage(window.$currentTab.id, message, () => {
-      if (chrome.runtime.lastError) {
-        errorHandler(new Error(`发送消息失败: ${chrome.runtime.lastError.message}`))
-      } else {
-        // eslint-disable-next-line no-console
-        console.log('草稿信息已更新')
-      }
-    })
+    // 带重试的消息发送
+    await sendMessageWithRetry(window.$currentTab.id, message)
   } catch (error) {
-    errorHandler(error as Error)
+    // 静默处理连接错误，避免干扰用户
+    if ((error as Error).message.includes('Could not establish connection')) {
+      // eslint-disable-next-line no-console
+      console.log('Content script 暂未准备就绪，将在下次更新时重试')
+    } else {
+      errorHandler(error as Error)
+    }
   }
 }, DEBOUNCE_DELAY)
+
+/**
+ * 带重试机制的消息发送
+ * @param tabId - 标签页ID
+ * @param message - 消息内容
+ * @param maxRetries - 最大重试次数
+ */
+async function sendMessageWithRetry(
+  tabId: number,
+  message: ChromeMessage,
+  maxRetries: number = 3
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        chrome.tabs.sendMessage(tabId, message, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('草稿信息已更新')
+            resolve()
+          }
+        })
+      })
+      return // 成功发送，退出重试循环
+    } catch (error) {
+      const errorMessage = (error as Error).message
+
+      if (attempt === maxRetries) {
+        throw error // 最后一次重试失败，抛出错误
+      }
+
+      // 只对连接问题进行重试
+      if (errorMessage.includes('Could not establish connection')) {
+        // eslint-disable-next-line no-console
+        console.log(`第${attempt}次发送失败，${500 * attempt}ms后重试...`)
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+      } else {
+        throw error // 其他类型错误不重试
+      }
+    }
+  }
+}
 
 /**
  * 处理数据库更新
