@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "DraftPaper",
-  "version": "0.1.0",
+  "name": "draft_paper",
+  "version": "0.2.0",
   "description": "前端草稿纸 - 帮助开发者进行页面布局对比和元素定位的Chrome扩展",
   "author": "wangfengxiang",
   "homepage_url": "https://github.com/dafengxiang/DraftPaper",
