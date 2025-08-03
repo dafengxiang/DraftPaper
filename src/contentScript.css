@@ -1,0 +1,61 @@
+/* DraftPaper Content Script 样式 */
+
+/* 草稿图片样式 */
+#draft-paper-image {
+  max-width: none !important;
+  max-height: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+  animation: none !important;
+}
+
+/* 拖拽边框样式 */
+.draft-drag-border {
+  position: relative !important;
+}
+
+.draft-drag-border::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -2px !important;
+  left: -2px !important;
+  right: -2px !important;
+  bottom: -2px !important;
+  border: 2px solid #ff0000 !important;
+  border-radius: 4px !important;
+  pointer-events: none !important;
+  z-index: 999999 !important;
+}
+
+/* 拖拽位置样式 */
+.draft-drag-position {
+  transition: transform 0.1s ease-out !important;
+}
+
+/* 隐藏复制输入框 */
+#draft-paper-copy-input {
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+/* 防止样式冲突 */
+[id^="draft-paper"] {
+  all: unset !important;
+}
+
+[id^="draft-paper"] * {
+  all: unset !important;
+}
