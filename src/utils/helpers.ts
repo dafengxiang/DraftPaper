@@ -82,8 +82,19 @@ export function compressImage(
       // 绘制压缩后的图片
       ctx?.drawImage(img, 0, 0, width, height)
 
-      // 转换为base64
-      const base64 = canvas.toDataURL('image/jpeg', quality)
+      // 根据原始文件类型决定输出格式，保持格式一致性
+      let outputFormat = file.type
+
+      // 如果是不支持的格式或者是GIF（canvas不支持动画），则转换为JPEG
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        outputFormat = 'image/jpeg'
+      }
+
+      // PNG格式不支持quality参数，使用默认质量
+      const finalQuality = outputFormat === 'image/png' ? undefined : quality
+
+      // 转换为base64，保持原始格式
+      const base64 = canvas.toDataURL(outputFormat, finalQuality)
       resolve(base64)
     }
 
