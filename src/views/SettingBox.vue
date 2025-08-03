@@ -36,8 +36,9 @@
         </div>
 
         <div class="help-text">
-          <p>⚠️ 模板必须包含 {top} 和 {left} 占位符</p>
-          <p>✅ 只允许使用 CSS 属性和值</p>
+          <p>💡 建议在模板中使用 {top} 和 {left} 占位符来获取拖拽位置</p>
+          <p>🎯 支持任何格式的代码模板，完全自由定制</p>
+          <p>🔒 系统会自动移除潜在的恶意代码以确保安全</p>
         </div>
       </div>
 
@@ -58,7 +59,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useDrafts } from '@/hooks/useDrafts'
-import { validateTemplate, sanitizeTemplate } from '@/utils/security'
+import { sanitizeTemplate } from '@/utils/security'
 import { createErrorHandler } from '@/utils/helpers'
 import { APP_CONFIG } from '@/config/constants'
 
@@ -95,21 +96,10 @@ const validateTemplateCode = (code: string): void => {
   hasError.value = false
   errorMessage.value = ''
 
+  // 只检查是否为空，允许任何模板输入
   if (!code.trim()) {
     hasError.value = true
     errorMessage.value = '模板不能为空'
-    return
-  }
-
-  if (!validateTemplate(code)) {
-    hasError.value = true
-    errorMessage.value = '模板格式无效或包含不安全的内容'
-    return
-  }
-
-  if (!code.includes('{top}') || !code.includes('{left}')) {
-    hasError.value = true
-    errorMessage.value = '模板必须包含 {top} 和 {left} 占位符'
     return
   }
 }
@@ -132,7 +122,7 @@ const saveTemplate = (): void => {
   } catch (error) {
     errorHandler(error as Error)
     hasError.value = true
-    errorMessage.value = '保存失败，请检查模板格式'
+    errorMessage.value = '保存失败：模板不能为空'
   }
 }
 

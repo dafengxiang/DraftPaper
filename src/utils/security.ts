@@ -22,16 +22,12 @@ export function sanitizeUrl(url: string): string {
 }
 
 /**
- * 验证模板代码的安全性
+ * 非空检查
  * @param template - 模板字符串
- * @returns 是否安全
+ * @returns 是否为空模版
  */
 export function validateTemplate(template: string): boolean {
-  // 只允许CSS属性、值和占位符
-  const allowedPattern = /^[a-zA-Z0-9\s:\-{}();.px%#]+$/
-  const hasPlaceholders = /\{(top|left)\}/.test(template)
-
-  return allowedPattern.test(template) && hasPlaceholders
+  return !!template.trim()
 }
 
 /**
@@ -41,14 +37,16 @@ export function validateTemplate(template: string): boolean {
  */
 export function sanitizeTemplate(template: string): string {
   if (!validateTemplate(template)) {
-    throw new Error('Invalid template code')
+    throw new Error('模板不能为空')
   }
 
-  // 移除可能的恶意代码
+  // 移除可能的恶意代码，但保持模板格式的灵活性
   return template
     .replace(/javascript:/gi, '')
     .replace(/<script/gi, '')
     .replace(/on\w+=/gi, '')
+    .replace(/eval\s*\(/gi, '')
+    .replace(/Function\s*\(/gi, '')
     .trim()
 }
 
