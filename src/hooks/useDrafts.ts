@@ -153,20 +153,12 @@ export function useDrafts() {
     }
   }
 
-  /**
-   * 重置草稿数据
-   */
-  const resetDrafts = (): void => {
-    draftsInfo.value = createDefaultDraftsInfo()
-  }
-
   return {
     draftsInfo,
     initDrafts,
     updateDraftsDB,
     addDraft,
     deleteDraft,
-    resetDrafts,
   }
 }
 
