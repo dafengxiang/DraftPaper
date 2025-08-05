@@ -13,6 +13,13 @@
       <div class="controls">
         <button
           v-if="!isLoading"
+          class="d-color-btn"
+          :class="{ disabled: !isColorCapture }"
+          :title="isColorCapture ? '点击关闭颜色拾取模式' : '点击开启颜色拾取模式'"
+          @click="handleColorCapture"
+        ></button>
+        <button
+          v-if="!isLoading"
           class="d-handle-btn"
           :class="{ disabled: !draftsInfo.isCanPick }"
           :title="draftsInfo.isCanPick ? '点击关闭拖拽模式' : '点击开启拖拽模式'"
@@ -58,6 +65,7 @@ import { ref, watch, onUnmounted, onMounted } from 'vue'
 import type { ChromeMessage, MessageType } from '@/types'
 import { openDB, closeDB } from '@/utils/database'
 import { useDrafts } from '@/hooks/useDrafts'
+import { useColorCapture } from '@/hooks/useColorCapture'
 import { generateDbKey, debounce, createErrorHandler } from '@/utils/helpers'
 import { DEBOUNCE_DELAY } from '@/config/constants'
 
@@ -74,7 +82,7 @@ const errorMessage = ref('')
 
 // 草稿数据管理
 const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
-
+const { isColorCapture, handleColorCapture } = useColorCapture()
 /**
  * 发送草稿更新消息到内容脚本（带重试机制）
  */
@@ -271,6 +279,7 @@ onUnmounted(() => {
     gap: 8px;
   }
 
+  .d-color-btn,
   .d-handle-btn,
   .d-setting-btn {
     .square(25px);
@@ -284,6 +293,13 @@ onUnmounted(() => {
 
     &:active {
       transform: scale(0.9);
+    }
+  }
+  .d-color-btn {
+    background: url('../icons/color.png') no-repeat center / contain;
+
+    &.disabled {
+      background-image: url('../icons/color_disabled.png');
     }
   }
 
