@@ -12,6 +12,8 @@ const PATHS = require('./paths')
 // CLI maintains a common webpack configuration file - `webpack.common.js`.
 // Whenever user creates an extension, CLI adds `webpack.common.js` file
 // in template's `config` folder
+const isProd = process.env.NODE_ENV === 'production'
+
 const common = {
   output: {
     // the build folder to output bundles and assets in.
@@ -88,8 +90,8 @@ const common = {
   },
   plugins: [
     new VueLoaderPlugin(),
-    // Print file sizes
-    new SizePlugin(),
+    // Print file sizes (only in production to avoid accessing SizeOnlySource in dev)
+    ...(isProd ? [new SizePlugin()] : []),
     // Copy static assets from `public` folder to `build` folder
     new CopyWebpackPlugin({
       patterns: [
