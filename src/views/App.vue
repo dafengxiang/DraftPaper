@@ -19,6 +19,13 @@
           @click="draftsInfo.isCanPick = !draftsInfo.isCanPick"
         ></button>
         <button
+          v-if="!isLoading && hasDraft"
+          class="d-color-picker-btn"
+          :class="{ active: isColorPickerActive }"
+          :title="isColorPickerActive ? '关闭取色器' : '开启取色器'"
+          @click="toggleColorPicker"
+        ></button>
+        <button
           class="d-setting-btn"
           :class="{ disabled: !isSetting }"
           :title="isSetting ? '退出设置' : '打开设置'"
@@ -47,14 +54,14 @@
         <!-- 草稿列表 -->
         <DraftList />
         <!-- 控制面板 -->
-        <ControlBox />
+        <ControlBox :is-color-picker-active="isColorPickerActive" />
       </template>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted, onMounted } from 'vue'
+import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
 import type { ChromeMessage, MessageType } from '@/types'
 import { openDB, closeDB } from '@/utils/database'
 import { useDrafts } from '@/hooks/useDrafts'
@@ -71,9 +78,17 @@ const errorHandler = createErrorHandler('App')
 const isSetting = ref(false)
 const isLoading = ref(true)
 const errorMessage = ref('')
+const isColorPickerActive = ref(false)
 
 // 草稿数据管理
 const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
+
+/**
+ * 是否有草稿
+ */
+const hasDraft = computed((): boolean => {
+  return !!(draftsInfo.value?.list && draftsInfo.value.list.length > 0)
+})
 
 /**
  * 发送草稿更新消息到内容脚本（带重试机制）
@@ -95,7 +110,7 @@ const sendDraftsUpdate = debounce(async () => {
     const message: ChromeMessage = {
       type: 'UPDATE_DRAFTS' as MessageType,
       payload: {
-        dbKey: generateDbKey(window.$currentUrl),
+        dbKey: generateDbKey(new URL(window.$currentUrl!)),
         draftsInfo: JSON.stringify(draftsInfo.value),
       },
     }
@@ -171,6 +186,44 @@ const handleDatabaseUpdate = debounce(async () => {
 }, DEBOUNCE_DELAY)
 
 /**
+ * 同步取色器状态
+ */
+const syncColorPickerState = async (): Promise<void> => {
+  try {
+    if (!window.$currentTab?.id) {
+      console.log('[DraftPaper] No current tab, skipping color picker state sync')
+      return
+    }
+
+    // 先检查内容脚本是否可用
+    const isContentScriptReady = await checkContentScriptAvailable()
+    if (!isContentScriptReady) {
+      console.log('[DraftPaper] Content script not ready, skipping color picker state sync')
+      return
+    }
+
+    const message = {
+      type: 'GET_COLOR_PICKER_STATE' as const,
+      payload: {},
+    }
+
+    chrome.tabs.sendMessage(window.$currentTab.id, message, (response) => {
+      if (chrome.runtime.lastError) {
+        const errorMsg = chrome.runtime.lastError.message
+        console.log('[DraftPaper] Color picker state sync failed (non-critical):', errorMsg)
+        // 不显示错误消息，因为这是非关键操作
+      } else if (response && response.success) {
+        isColorPickerActive.value = response.isActive || false
+        console.log('[DraftPaper] Color picker state synced:', response)
+      }
+    })
+  } catch (error) {
+    console.log('[DraftPaper] Color picker state sync error (non-critical):', error)
+    // 不显示错误消息，因为这是非关键操作
+  }
+}
+
+/**
  * 初始化应用
  */
 const initializeApp = async (): Promise<void> => {
@@ -183,6 +236,11 @@ const initializeApp = async (): Promise<void> => {
 
     // 初始化草稿数据
     await initDrafts()
+
+    // 同步取色器状态（非关键操作，失败不影响应用启动）
+    syncColorPickerState().catch((error) => {
+      console.log('[DraftPaper] Color picker state sync failed during init (non-critical):', error)
+    })
 
     isLoading.value = false
   } catch (error) {
@@ -201,7 +259,7 @@ const handleUrlChange = (request: ChromeMessage): void => {
       return
     }
 
-    const currentDbKey = generateDbKey(window.$currentUrl)
+    const currentDbKey = generateDbKey(new URL(window.$currentUrl!))
 
     if (request.payload.dbKey !== currentDbKey) {
       // eslint-disable-next-line no-console
@@ -210,6 +268,84 @@ const handleUrlChange = (request: ChromeMessage): void => {
     }
   } catch (error) {
     errorHandler(error as Error)
+  }
+}
+
+/**
+ * 检查内容脚本是否可用
+ */
+const checkContentScriptAvailable = async (): Promise<boolean> => {
+  try {
+    if (!window.$currentTab?.id) return false
+
+    // 发送一个简单的ping消息来检查内容脚本是否响应
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(window.$currentTab!.id!, { type: 'PING' }, (_response) => {
+        if (chrome.runtime.lastError) {
+          resolve(false)
+        } else {
+          resolve(true)
+        }
+      })
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 切换取色器状态
+ */
+const toggleColorPicker = async (): Promise<void> => {
+  try {
+    // 检查内容脚本是否可用
+    const isContentScriptReady = await checkContentScriptAvailable()
+    if (!isContentScriptReady) {
+      errorMessage.value = '内容脚本未加载，请刷新页面后重试'
+      return
+    }
+
+    isColorPickerActive.value = !isColorPickerActive.value
+
+    // 发送消息到内容脚本
+    if (window.$currentTab?.id) {
+      const currentDraft = draftsInfo.value?.list?.[draftsInfo.value.selectedIdx || 0]
+      const message = {
+        type: 'TOGGLE_COLOR_PICKER' as const,
+        payload: {
+          isActive: isColorPickerActive.value,
+          opacity: isColorPickerActive.value ? 1 : currentDraft?.opacity || 1,
+        },
+      }
+
+      chrome.tabs.sendMessage(window.$currentTab.id, message, (response) => {
+        if (chrome.runtime.lastError) {
+          const errorMsg = chrome.runtime.lastError.message
+          console.error('Failed to toggle color picker:', errorMsg)
+
+          // 如果是连接错误，显示用户友好的提示
+          if (
+            errorMsg &&
+            (errorMsg.includes('Could not establish connection') ||
+              errorMsg.includes('Receiving end does not exist'))
+          ) {
+            errorMessage.value = '内容脚本连接失败，请刷新页面后重试'
+            // 重置取色器状态
+            isColorPickerActive.value = false
+          }
+        } else if (response && !response.success) {
+          errorMessage.value = '取色器操作失败，请重试'
+          isColorPickerActive.value = false
+        }
+      })
+    } else {
+      errorMessage.value = '无法获取当前标签页信息'
+      isColorPickerActive.value = false
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+    errorMessage.value = '取色器操作失败，请重试'
+    isColorPickerActive.value = false
   }
 }
 
@@ -272,11 +408,12 @@ onUnmounted(() => {
   }
 
   .d-handle-btn,
+  .d-color-picker-btn,
   .d-setting-btn {
     .square(25px);
     border: none;
     cursor: pointer;
-    transition: opacity 0.2s ease;
+    transition: all 0.2s ease;
 
     &:hover {
       opacity: 0.8;
@@ -292,6 +429,28 @@ onUnmounted(() => {
 
     &.disabled {
       background-image: url('../icons/pick_disabled.png');
+    }
+  }
+
+  .d-color-picker-btn {
+    background: #ff9900;
+    border-radius: 50%;
+    position: relative;
+    font-size: 14px;
+    color: #000;
+    font-weight: bold;
+
+    &::before {
+      content: '🎨';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    &.active {
+      background: #00ff00;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
     }
   }
 

@@ -32,7 +32,8 @@ async function initPopupApp(): Promise<void> {
 
     // 检查是否为支持的协议
     if (!['http:', 'https:'].includes(currentUrl.protocol)) {
-      throw new Error('当前页面不支持使用此扩展（仅支持 http/https 协议）')
+      showUnsupportedPageMessage(currentUrl.protocol)
+      return
     }
 
     // 设置全局变量（类型安全）
@@ -92,6 +93,35 @@ function showErrorMessage(message: string): void {
         <p style="margin: 0;">${message}</p>
         <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">
           请刷新页面或联系开发者
+        </p>
+      </div>
+    `
+  }
+}
+
+/**
+ * 显示不支持的页面信息
+ * @param protocol - 当前页面协议
+ */
+function showUnsupportedPageMessage(protocol: string): void {
+  const appElement = document.getElementById('app')
+  if (appElement) {
+    appElement.innerHTML = `
+      <div style="
+        padding: 20px; 
+        text-align: center; 
+        color: #fff; 
+        background: #333;
+        font-size: 14px;
+        line-height: 1.5;
+      ">
+        <h3 style="color: #ffa500; margin-bottom: 10px;">ℹ️ 提示</h3>
+        <p style="margin: 0;">当前页面协议为 <code style="background: #555; padding: 2px 6px; border-radius: 3px;">${protocol}</code></p>
+        <p style="margin: 10px 0 0 0; color: #ccc;">
+          DraftPaper 扩展仅支持 HTTP/HTTPS 协议的网页
+        </p>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #999;">
+          请访问普通网页后使用此扩展
         </p>
       </div>
     `
