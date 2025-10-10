@@ -45,6 +45,9 @@ export enum MessageType {
   GET_DRAFTS = 'GET_DRAFTS',
   UPDATE_DRAFTS = 'UPDATE_DRAFTS',
   URL_CHANGE = 'URL_CHANGE',
+  TOGGLE_COLOR_PICKER = 'TOGGLE_COLOR_PICKER',
+  PING = 'PING',
+  GET_COLOR_PICKER_STATE = 'GET_COLOR_PICKER_STATE',
 }
 
 /**
@@ -53,8 +56,10 @@ export enum MessageType {
 export interface ChromeMessage {
   type: MessageType
   payload: {
-    dbKey: string
+    dbKey?: string
     draftsInfo?: string
+    isActive?: boolean
+    opacity?: number
   }
 }
 
@@ -101,4 +106,12 @@ export interface AppConfig {
   maxImageSize: number
   /** 支持的图片格式 */
   supportedImageTypes: string[]
+}
+
+declare global {
+  interface Window {
+    $currentTab?: chrome.tabs.Tab
+    $currentUrl?: string
+    html2canvas?: (element: HTMLElement, options?: any) => Promise<HTMLCanvasElement>
+  }
 }

@@ -8,11 +8,11 @@
 <template>
   <section class="m-control-box">
     <h4 class="section-title">草稿控制</h4>
-    
+
     <div v-if="!hasDraft" class="no-draft">
       <p>暂无草稿，请先添加草稿图片</p>
     </div>
-    
+
     <form v-else class="control-form" @submit.prevent>
       <div class="form-group">
         <label for="width-input" class="label">宽度 (px):</label>
@@ -26,7 +26,7 @@
           step="1"
         />
       </div>
-      
+
       <div class="form-group">
         <label for="top-input" class="label">顶部 (px):</label>
         <input
@@ -37,7 +37,7 @@
           step="1"
         />
       </div>
-      
+
       <div class="form-group">
         <label for="left-input" class="label">左侧 (px):</label>
         <input
@@ -48,9 +48,9 @@
           step="1"
         />
       </div>
-      
+
       <div class="form-group">
-        <label for="opacity-input" class="label">
+        <label for="opacity-input" class="label" :class="{ disabled: props.isColorPickerActive }">
           透明度: {{ (currentDraft!.opacity * 100).toFixed(0) }}%
         </label>
         <input
@@ -58,10 +58,15 @@
           v-model.number="currentDraft!.opacity"
           type="range"
           class="range-input"
+          :class="{ disabled: props.isColorPickerActive }"
+          :disabled="props.isColorPickerActive"
           min="0"
           max="1"
           step="0.05"
         />
+        <div v-if="props.isColorPickerActive" class="disabled-hint">
+          取色模式下透明度已锁定为100%
+        </div>
       </div>
     </form>
   </section>
@@ -72,6 +77,13 @@ import { computed } from 'vue'
 import { useDrafts } from '@/hooks/useDrafts'
 import type { DraftItem } from '@/types'
 
+// 定义props
+interface Props {
+  isColorPickerActive: boolean
+}
+
+const props = defineProps<Props>()
+
 const { draftsInfo } = useDrafts()
 
 /**
@@ -80,11 +92,11 @@ const { draftsInfo } = useDrafts()
 const currentDraft = computed((): DraftItem | undefined => {
   const list = draftsInfo.value?.list
   const selectedIdx = draftsInfo.value?.selectedIdx
-  
+
   if (!list || typeof selectedIdx !== 'number' || selectedIdx < 0 || selectedIdx >= list.length) {
     return undefined
   }
-  
+
   return list[selectedIdx]
 })
 
@@ -122,7 +134,7 @@ const hasDraft = computed((): boolean => {
   .control-form {
     .form-group {
       margin-bottom: 16px;
-      
+
       &:last-child {
         margin-bottom: 0;
       }
@@ -134,6 +146,10 @@ const hasDraft = computed((): boolean => {
       color: #ddd;
       margin-bottom: 6px;
       font-weight: 500;
+
+      &.disabled {
+        color: #888;
+      }
     }
 
     .number-input {
@@ -163,7 +179,7 @@ const hasDraft = computed((): boolean => {
         margin: 0;
       }
 
-      &[type=number] {
+      &[type='number'] {
         -moz-appearance: textfield;
       }
     }
@@ -217,6 +233,19 @@ const hasDraft = computed((): boolean => {
         background: #555;
         border: none;
       }
+
+      &.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+      }
+    }
+
+    .disabled-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #888;
+      font-style: italic;
     }
   }
 }

@@ -36,6 +36,13 @@ let currentTemplateCode = APP_CONFIG.defaultTemplate
 // 当前点击元素的选择器链（清洗后）
 let currentSelectorChain = ''
 
+// 取色器状态
+let isColorPickerActive = false
+let magnifierElement: HTMLDivElement | null = null
+let originalOpacity: number | null = 1 // 保存原始透明度
+let pageScreenshot: string | null = null
+let isScrollLocked = false
+
 /**
  * 初始化内容脚本
  */
@@ -149,6 +156,20 @@ function registerEventListeners(): void {
     try {
       if (request.type === 'UPDATE_DRAFTS') {
         handleDraft(request.payload.draftsInfo)
+      } else if (request.type === 'TOGGLE_COLOR_PICKER') {
+        handleColorPickerToggle(request.payload.isActive || false, request.payload.opacity || 1)
+      } else if (request.type === 'PING') {
+        // 简单的ping响应，用于检查内容脚本是否可用
+        sendResponse({ success: true, message: 'Content script is ready' })
+        return true
+      } else if (request.type === 'GET_COLOR_PICKER_STATE') {
+        // 获取当前取色器状态
+        sendResponse({
+          success: true,
+          isActive: isColorPickerActive,
+          originalOpacity: originalOpacity,
+        })
+        return true
       }
       sendResponse({ success: true })
     } catch (error) {
@@ -627,6 +648,21 @@ function cleanup(): void {
     // 清理拖拽状态
     clearDragState()
 
+    // 清理取色器
+    if (isColorPickerActive) {
+      removeMagnifier()
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('click', handleColorClick, true)
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('pointerup', handlePointerUp)
+      if (magnifierUpdateTimeout) {
+        clearTimeout(magnifierUpdateTimeout)
+        magnifierUpdateTimeout = null
+      }
+      isColorPickerActive = false
+    }
+
     // 移除样式
     const styleElement = document.getElementById('draft-paper-styles')
     if (styleElement) {
@@ -638,6 +674,1192 @@ function cleanup(): void {
     if (inputElement) {
       inputElement.remove()
     }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理取色器切换
+ * @param isActive - 是否激活取色器
+ * @param opacity - 草稿图片透明度
+ */
+function handleColorPickerToggle(isActive: boolean, opacity: number): void {
+  try {
+    // 如果状态没有变化，直接返回
+    if (isColorPickerActive === isActive) {
+      // eslint-disable-next-line no-console
+      console.log('[DraftPaper] Color picker state unchanged, skipping')
+      return
+    }
+
+    isColorPickerActive = isActive
+
+    if (isActive) {
+      // 保存当前透明度
+      if (draftImgDom) {
+        originalOpacity = parseFloat(draftImgDom.style.opacity) || 1
+        // 设置草稿图片透明度为100%
+        draftImgDom.style.opacity = '1'
+      }
+
+      // 锁定页面滚动
+      lockPageScroll()
+
+      // 创建页面截图
+      createPageScreenshot().then(() => {
+        // 确保截图创建成功后再继续
+        if (pageScreenshot) {
+          // 创建放大镜
+          createMagnifier()
+
+          // 添加鼠标移动监听
+          document.addEventListener('mousemove', handleMouseMove)
+          document.addEventListener('click', handleColorClick, true) // 使用capture阶段确保优先处理
+
+          // 检测是否为移动端模拟模式，如果是则强制启用鼠标事件
+          const isMobileSimulation =
+            window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+          if (isMobileSimulation) {
+            // 在移动端模拟模式下，强制启用鼠标事件
+            document.addEventListener('mousemove', handleMouseMove, { passive: false })
+          }
+
+          // 添加触摸事件支持（用于手机模式）
+          document.addEventListener('touchstart', handleColorPickerTouchStart, { passive: false })
+          document.addEventListener('touchmove', handleColorPickerTouchMove, { passive: false })
+          document.addEventListener('touchend', handleColorPickerTouchEnd, { passive: false })
+
+          // 添加移动端鼠标事件支持（用于设备模拟模式）
+          document.addEventListener('pointermove', handlePointerMove, { passive: false })
+          document.addEventListener('pointerdown', handlePointerDown, { passive: false })
+          document.addEventListener('pointerup', handlePointerUp, { passive: false })
+
+          // 立即显示放大镜（在鼠标当前位置）
+          if (magnifierElement) {
+            magnifierElement.style.display = 'block'
+            // 触发一次鼠标移动事件来更新放大镜位置
+            const mouseEvent = new MouseEvent('mousemove', {
+              clientX: 0,
+              clientY: 0,
+              bubbles: true,
+            })
+            handleMouseMove(mouseEvent)
+
+            // 也触发指针事件，确保移动端模拟模式下也能工作
+            const pointerEvent = new PointerEvent('pointermove', {
+              clientX: 0,
+              clientY: 0,
+              bubbles: true,
+            })
+            handlePointerMove(pointerEvent)
+          }
+        } else {
+          console.error(
+            '[DraftPaper] Failed to create screenshot, color picker cannot be activated'
+          )
+          // 恢复状态
+          isColorPickerActive = false
+          unlockPageScroll()
+          if (draftImgDom && originalOpacity !== null) {
+            draftImgDom.style.opacity = originalOpacity.toString()
+            originalOpacity = null
+          }
+        }
+      })
+    } else {
+      // 恢复草稿图片透明度
+      if (draftImgDom) {
+        const restoreOpacity = opacity > 0 ? opacity : originalOpacity || 1
+        draftImgDom.style.opacity = restoreOpacity.toString()
+        // eslint-disable-next-line no-console
+        console.log('[DraftPaper] Draft image opacity restored to:', restoreOpacity)
+      }
+
+      // 解锁页面滚动
+      unlockPageScroll()
+
+      // 清理页面截图
+      pageScreenshot = null
+
+      // 移除放大镜
+      removeMagnifier()
+
+      // 移除事件监听
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('click', handleColorClick, true)
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('pointerup', handlePointerUp)
+      document.removeEventListener('touchstart', handleColorPickerTouchStart)
+      document.removeEventListener('touchmove', handleColorPickerTouchMove)
+      document.removeEventListener('touchend', handleColorPickerTouchEnd)
+
+      // 清理防抖定时器
+      if (magnifierUpdateTimeout) {
+        clearTimeout(magnifierUpdateTimeout)
+        magnifierUpdateTimeout = null
+      }
+
+      // 重置放大镜相关变量
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 锁定页面滚动
+ */
+function lockPageScroll(): void {
+  try {
+    if (isScrollLocked) return
+
+    // 保存当前滚动位置
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop
+
+    // 锁定滚动
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = `-${scrollX}px`
+    document.body.style.width = '100%'
+
+    isScrollLocked = true
+  } catch (error) {
+    console.error('[DraftPaper] Error locking page scroll:', error)
+  }
+}
+
+/**
+ * 解锁页面滚动
+ */
+function unlockPageScroll(): void {
+  try {
+    if (!isScrollLocked) return
+
+    // 恢复滚动
+    document.body.style.overflow = ''
+    document.documentElement.style.overflow = ''
+    document.body.style.position = ''
+    document.body.style.top = ''
+    document.body.style.left = ''
+    document.body.style.width = ''
+
+    isScrollLocked = false
+    console.log('[DraftPaper] Page scroll unlocked')
+  } catch (error) {
+    console.error('[DraftPaper] Error unlocking page scroll:', error)
+  }
+}
+
+/**
+ * 创建页面截图
+ */
+async function createPageScreenshot(): Promise<void> {
+  try {
+    // 使用html2canvas创建页面截图
+    if (window.html2canvas) {
+      // 检查草稿纸是否存在
+      if (draftImgDom) {
+        console.log("[DraftPaper] Draft paper found, ensuring it's visible in screenshot:", {
+          display: window.getComputedStyle(draftImgDom).display,
+          visibility: window.getComputedStyle(draftImgDom).visibility,
+          opacity: window.getComputedStyle(draftImgDom).opacity,
+          zIndex: window.getComputedStyle(draftImgDom).zIndex,
+          position: window.getComputedStyle(draftImgDom).position,
+          rect: draftImgDom.getBoundingClientRect(),
+        })
+      }
+
+      const canvas = await window.html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        width: document.documentElement.scrollWidth,
+        height: document.documentElement.scrollHeight,
+        // 确保包含所有元素，包括高z-index的元素
+        ignoreElements: (element: Element) => {
+          // 排除放大镜本身
+          return element.classList.contains('draft-paper-magnifier')
+        },
+      })
+
+      pageScreenshot = canvas.toDataURL('image/png')
+
+      // 创建一个临时图片来检查截屏内容
+      const testImg = new Image()
+      testImg.onload = () => {
+        // 验证截屏中是否包含草稿纸
+        if (draftImgDom) {
+          verifyDraftPaperInScreenshot(testImg, draftImgDom)
+        }
+      }
+      testImg.src = pageScreenshot
+    } else {
+      // 使用DOM克隆方法创建页面截图
+      pageScreenshot = await createDOMScreenshot()
+    }
+  } catch (error) {
+    console.error('[DraftPaper] Error creating page screenshot:', error)
+    pageScreenshot = null
+  }
+}
+
+/**
+ * 使用DOM克隆方法创建页面截图
+ */
+async function createDOMScreenshot(): Promise<string | null> {
+  try {
+    // 创建一个临时的canvas来绘制页面内容
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    // 设置canvas尺寸
+    canvas.width = document.documentElement.scrollWidth
+    canvas.height = document.documentElement.scrollHeight
+
+    // 设置白色背景
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // 克隆页面内容
+    const clonedBody = document.body.cloneNode(true) as HTMLElement
+    clonedBody.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: white;
+    `
+
+    // 移除干扰元素
+    const elementsToRemove = clonedBody.querySelectorAll(
+      '.draft-paper-magnifier, script, style, [style*="position: fixed"]'
+    )
+    elementsToRemove.forEach((el) => el.remove())
+
+    // 创建临时容器
+    const tempContainer = document.createElement('div')
+    tempContainer.style.cssText = `
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+      width: ${canvas.width}px;
+      height: ${canvas.height}px;
+      overflow: hidden;
+      background: white;
+    `
+    tempContainer.appendChild(clonedBody)
+    document.body.appendChild(tempContainer)
+
+    // 使用html2canvas的替代方案：直接绘制到canvas
+    // 这里我们使用一个简化的方法，绘制页面结构
+    drawPageStructureToCanvas(ctx, canvas.width, canvas.height)
+
+    // 清理临时容器
+    document.body.removeChild(tempContainer)
+
+    const dataURL = canvas.toDataURL('image/png')
+    return dataURL
+  } catch (error) {
+    console.error('[DraftPaper] Error creating DOM screenshot:', error)
+    return null
+  }
+}
+
+/**
+ * 绘制页面结构到canvas
+ */
+function drawPageStructureToCanvas(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number
+): void {
+  // 绘制页面背景
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+
+  // 绘制一些基本的页面元素作为示例
+  // 这里可以根据需要添加更复杂的页面内容绘制逻辑
+  ctx.fillStyle = '#f0f0f0'
+  ctx.fillRect(0, 0, width, 60) // 顶部区域
+
+  // 绘制网格背景
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)'
+  ctx.lineWidth = 1
+  const gridSize = 20
+
+  for (let x = 0; x < width; x += gridSize) {
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, height)
+    ctx.stroke()
+  }
+
+  for (let y = 0; y < height; y += gridSize) {
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+
+  // 如果有草稿图片，绘制它
+  if (draftImgDom) {
+    drawDraftImageToCanvas(ctx, draftImgDom)
+  }
+}
+
+/**
+ * 验证截屏中是否包含草稿纸
+ */
+function verifyDraftPaperInScreenshot(
+  screenshotImg: HTMLImageElement,
+  draftImg: HTMLElement
+): void {
+  try {
+    const rect = draftImg.getBoundingClientRect()
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop
+
+    // 计算草稿纸在截屏中的位置
+    const pageWidth = document.documentElement.scrollWidth || window.innerWidth
+    const pageHeight = document.documentElement.scrollHeight || window.innerHeight
+    const scaleX = screenshotImg.naturalWidth / pageWidth
+    const scaleY = screenshotImg.naturalHeight / pageHeight
+
+    const draftX = (rect.left + scrollX) * scaleX
+    const draftY = (rect.top + scrollY) * scaleY
+    const draftWidth = rect.width * scaleX
+    const draftHeight = rect.height * scaleY
+
+    // 创建一个临时canvas来检查截屏中的草稿纸区域
+    const tempCanvas = document.createElement('canvas')
+    const tempCtx = tempCanvas.getContext('2d')
+    if (!tempCtx) return
+
+    tempCanvas.width = 1
+    tempCanvas.height = 1
+
+    // 在草稿纸中心采样一个像素
+    const centerX = Math.floor(draftX + draftWidth / 2)
+    const centerY = Math.floor(draftY + draftHeight / 2)
+
+    if (
+      centerX >= 0 &&
+      centerX < screenshotImg.naturalWidth &&
+      centerY >= 0 &&
+      centerY < screenshotImg.naturalHeight
+    ) {
+      tempCtx.drawImage(screenshotImg, centerX, centerY, 1, 1, 0, 0, 1, 1)
+      const imageData = tempCtx.getImageData(0, 0, 1, 1)
+      const [r, g, b, a] = imageData.data
+
+      console.log('[DraftPaper] Draft paper center pixel in screenshot:', {
+        centerX,
+        centerY,
+        rgba: { r, g, b, a },
+        isTransparent: a === 0,
+        isWhite: r === 255 && g === 255 && b === 255 && a === 255,
+      })
+
+      if (a === 0) {
+        console.warn('[DraftPaper] Draft paper appears to be transparent in screenshot!')
+      } else if (r === 255 && g === 255 && b === 255 && a === 255) {
+        console.warn('[DraftPaper] Draft paper appears to be white in screenshot!')
+      } else {
+        console.log('[DraftPaper] Draft paper appears to be visible in screenshot')
+      }
+    } else {
+      console.warn('[DraftPaper] Draft paper center is out of bounds in screenshot')
+    }
+  } catch (error) {
+    console.error('[DraftPaper] Error verifying draft paper in screenshot:', error)
+  }
+}
+
+/**
+ * 绘制草稿图片到canvas
+ */
+function drawDraftImageToCanvas(ctx: CanvasRenderingContext2D, img: HTMLElement): void {
+  if (!(img instanceof HTMLImageElement)) {
+    console.log('[DraftPaper] Draft element is not an image element')
+    return
+  }
+
+  const rect = img.getBoundingClientRect()
+  const scrollX = window.pageXOffset || document.documentElement.scrollLeft
+  const scrollY = window.pageYOffset || document.documentElement.scrollTop
+
+  const x = rect.left + scrollX
+  const y = rect.top + scrollY
+  const width = rect.width
+  const height = rect.height
+
+  // 绘制图片
+  try {
+    ctx.drawImage(img, x, y, width, height)
+  } catch (error) {
+    console.error('[DraftPaper] Error drawing draft image to canvas:', error)
+  }
+}
+
+/**
+ * 创建放大镜
+ */
+function createMagnifier(): void {
+  try {
+    removeMagnifier() // 先移除已存在的放大镜
+
+    magnifierElement = document.createElement('div')
+    magnifierElement.id = 'draft-paper-magnifier'
+    magnifierElement.style.cssText = `
+      position: fixed;
+      width: 75px;
+      height: 75px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.95);
+      pointer-events: none;
+      z-index: 1000001;
+      display: none;
+      overflow: hidden;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+    `
+
+    // 创建放大镜内容容器
+    const magnifierContent = document.createElement('div')
+    magnifierContent.style.cssText = `
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #f0f0f0;
+    `
+
+    magnifierElement.appendChild(magnifierContent)
+    document.body.appendChild(magnifierElement)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 移除放大镜
+ */
+function removeMagnifier(): void {
+  try {
+    if (magnifierElement) {
+      // 清理放大镜内容
+      const magnifierContent = magnifierElement.firstElementChild as HTMLElement
+      if (magnifierContent) {
+        // 清理所有子元素
+        while (magnifierContent.firstChild) {
+          magnifierContent.removeChild(magnifierContent.firstChild)
+        }
+      }
+
+      // 移除放大镜元素
+      magnifierElement.remove()
+      magnifierElement = null
+
+      console.log('[DraftPaper] Magnifier removed')
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+// 放大镜更新防抖
+let magnifierUpdateTimeout: number | null = null
+
+/**
+ * 处理鼠标移动
+ * @param event - 鼠标事件
+ */
+function handleMouseMove(event: MouseEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    const { clientX, clientY } = event
+
+    // 显示放大镜并跟随鼠标
+    magnifierElement.style.display = 'block'
+    magnifierElement.style.left = `${clientX - 37.5}px`
+    magnifierElement.style.top = `${clientY - 37.5}px`
+
+    // 更新放大镜内容
+    updateMagnifierContent(clientX, clientY)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理取色器触摸开始
+ * @param event - 触摸事件
+ */
+function handleColorPickerTouchStart(event: TouchEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    event.preventDefault()
+
+    const touch = event.touches[0]
+    if (!touch) {
+      return
+    }
+
+    const { clientX, clientY } = touch
+
+    // 显示放大镜并跟随触摸
+    magnifierElement.style.display = 'block'
+    magnifierElement.style.left = `${clientX - 37.5}px`
+    magnifierElement.style.top = `${clientY - 37.5}px`
+
+    // 添加视觉反馈，确保放大镜位置正确
+    magnifierElement.style.transform = 'scale(1)'
+    magnifierElement.style.transition = 'none'
+
+    // 更新放大镜内容
+    updateMagnifierContent(clientX, clientY)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理指针移动事件（支持移动端模拟）
+ * @param event - 指针事件
+ */
+function handlePointerMove(event: PointerEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    const { clientX, clientY } = event
+
+    // 显示放大镜并跟随指针
+    magnifierElement.style.display = 'block'
+    magnifierElement.style.left = `${clientX - 37.5}px`
+    magnifierElement.style.top = `${clientY - 37.5}px`
+
+    // 更新放大镜内容
+    updateMagnifierContent(clientX, clientY)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理指针按下事件（支持移动端模拟）
+ * @param event - 指针事件
+ */
+function handlePointerDown(event: PointerEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    const { clientX, clientY } = event
+
+    // 显示放大镜并跟随指针
+    magnifierElement.style.display = 'block'
+    magnifierElement.style.left = `${clientX - 37.5}px`
+    magnifierElement.style.top = `${clientY - 37.5}px`
+
+    // 更新放大镜内容
+    updateMagnifierContent(clientX, clientY)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理指针抬起事件（支持移动端模拟）
+ * @param event - 指针事件
+ */
+function handlePointerUp(event: PointerEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    const { clientX, clientY } = event
+
+    // 获取点击位置的实际像素颜色
+    if (pageScreenshot) {
+      const img = new Image()
+      img.onload = () => {
+        const captureSize = 150 / 12
+        const captureX = clientX - captureSize / 2
+        const captureY = clientY - captureSize / 2
+
+        const actualPixelColor = getActualPixelColorFromScreenshot(
+          img,
+          clientX,
+          clientY,
+          captureX,
+          captureY,
+          12
+        )
+
+        if (actualPixelColor) {
+          copyToClipboard(actualPixelColor).then((success) => {
+            if (success) {
+              showColorNotification(actualPixelColor)
+            } else {
+              errorHandler(new Error('色值复制失败'))
+            }
+          })
+        } else {
+          console.warn('[DraftPaper] 无法获取实际像素颜色')
+        }
+      }
+      img.src = pageScreenshot
+    } else {
+      console.warn('[DraftPaper] 没有页面截图，无法获取实际像素颜色')
+      showColorNotification('请先开启取色器')
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理取色器触摸移动
+ * @param event - 触摸事件
+ */
+function handleColorPickerTouchMove(event: TouchEvent): void {
+  try {
+    if (!magnifierElement || !isColorPickerActive) {
+      return
+    }
+
+    event.preventDefault()
+
+    const touch = event.touches[0]
+    if (!touch) {
+      return
+    }
+
+    const { clientX, clientY } = touch
+
+    // 显示放大镜并跟随触摸
+    magnifierElement.style.display = 'block'
+    magnifierElement.style.left = `${clientX - 37.5}px`
+    magnifierElement.style.top = `${clientY - 37.5}px`
+
+    // 添加视觉反馈，确保放大镜位置正确
+    magnifierElement.style.transform = 'scale(1)'
+    magnifierElement.style.transition = 'none'
+
+    // 更新放大镜内容
+    updateMagnifierContent(clientX, clientY)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 处理取色器触摸结束
+ * @param event - 触摸事件
+ */
+async function handleColorPickerTouchEnd(event: TouchEvent): Promise<void> {
+  try {
+    if (!isColorPickerActive) return
+
+    event.preventDefault()
+
+    const touch = event.changedTouches[0]
+    if (!touch) return
+
+    const { clientX, clientY } = touch
+
+    // 获取点击位置的实际像素颜色
+    if (pageScreenshot) {
+      const img = new Image()
+      img.onload = () => {
+        const captureSize = 150 / 12
+        const captureX = clientX - captureSize / 2
+        const captureY = clientY - captureSize / 2
+
+        const actualPixelColor = getActualPixelColorFromScreenshot(
+          img,
+          clientX,
+          clientY,
+          captureX,
+          captureY,
+          12
+        )
+
+        if (actualPixelColor) {
+          copyToClipboard(actualPixelColor).then((success) => {
+            if (success) {
+              showColorNotification(actualPixelColor)
+            } else {
+              errorHandler(new Error('色值复制失败'))
+            }
+          })
+        } else {
+          console.warn('[DraftPaper] 无法获取实际像素颜色')
+        }
+      }
+      img.src = pageScreenshot
+    } else {
+      console.warn('[DraftPaper] 没有页面截图，无法获取实际像素颜色')
+      showColorNotification('请先开启取色器')
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 更新放大镜内容
+ * @param x - X坐标
+ * @param y - Y坐标
+ */
+function updateMagnifierContent(x: number, y: number): void {
+  try {
+    if (!magnifierElement) {
+      return
+    }
+
+    const magnifierContent = magnifierElement.firstElementChild as HTMLElement
+    if (!magnifierContent) {
+      return
+    }
+
+    // 放大镜参数
+    const magnifierSize = 75
+    const zoomFactor = 12 // 保持放大倍数不变
+    const captureSize = magnifierSize / zoomFactor
+
+    // 计算截取区域（以鼠标为中心）
+    const captureX = x - captureSize / 2
+    const captureY = y - captureSize / 2
+
+    // 清理旧内容
+    magnifierContent.innerHTML = ''
+
+    // 创建canvas来显示放大效果
+    const canvas = document.createElement('canvas')
+    canvas.width = magnifierSize
+    canvas.height = magnifierSize
+    canvas.style.cssText = `
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      border-radius: 50%;
+    `
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      console.log('[DraftPaper] Could not get canvas context')
+      return
+    }
+
+    // 如果有页面截图，使用截图
+    if (pageScreenshot) {
+      const img = new Image()
+      img.onload = () => {
+        // 绘制放大区域
+        ctx.drawImage(
+          img,
+          captureX,
+          captureY,
+          captureSize,
+          captureSize, // 源区域
+          0,
+          0,
+          magnifierSize,
+          magnifierSize // 目标区域
+        )
+
+        // 绘制像素网格
+        drawMagnifierGrid(ctx, magnifierSize, zoomFactor)
+
+        // 从截图中获取中心像素的实际颜色（与点击取色使用相同方法）
+        const centerColor = getActualPixelColorFromScreenshot(
+          img,
+          x,
+          y,
+          captureX,
+          captureY,
+          zoomFactor
+        )
+
+        if (centerColor) {
+          const centerX = magnifierSize / 2
+          const centerY = magnifierSize / 2
+          const gridSize = zoomFactor
+
+          // 绘制中心像素
+          ctx.fillStyle = centerColor
+          ctx.fillRect(centerX - gridSize / 2, centerY - gridSize / 2, gridSize, gridSize)
+
+          // 绘制颜色边框
+          ctx.strokeStyle = '#000000'
+          ctx.lineWidth = 1
+          ctx.strokeRect(centerX - gridSize / 2, centerY - gridSize / 2, gridSize, gridSize)
+
+          // 绘制颜色值文本（这就是剪切板中会复制的颜色）
+          ctx.fillStyle = '#000000'
+          ctx.font = 'bold 10px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText(centerColor, centerX, centerY + 25)
+        }
+
+        // 高亮中心像素（已移除红色边框）
+
+        // 添加十字准星
+        addMagnifierCrosshair(ctx, magnifierSize)
+      }
+      img.src = pageScreenshot
+    } else {
+      // 如果没有截图，显示等待提示
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, magnifierSize, magnifierSize)
+
+      ctx.fillStyle = '#ff0000'
+      ctx.font = 'bold 12px Arial'
+      ctx.textAlign = 'center'
+
+      console.log('[DraftPaper] No screenshot available, waiting for screenshot creation')
+    }
+
+    magnifierContent.appendChild(canvas)
+
+    // 添加边框
+    addMagnifierOverlays(magnifierContent, magnifierSize)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 绘制放大镜网格
+ */
+function drawMagnifierGrid(ctx: CanvasRenderingContext2D, size: number, pixelSize: number): void {
+  // 绘制细网格线（像素边界）
+  ctx.strokeStyle = '#666666'
+  ctx.lineWidth = 0.8
+  ctx.globalAlpha = 0.7
+
+  for (let i = 0; i <= size; i += pixelSize) {
+    ctx.beginPath()
+    ctx.moveTo(i, 0)
+    ctx.lineTo(i, size)
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(0, i)
+    ctx.lineTo(size, i)
+    ctx.stroke()
+  }
+
+  // 重置透明度
+  ctx.globalAlpha = 1
+}
+
+/**
+ * 从截图中获取放大镜中心点的实际像素颜色
+ */
+function getActualPixelColorFromScreenshot(
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  _captureX: number,
+  _captureY: number,
+  _zoomFactor: number
+): string | null {
+  try {
+    // 创建临时canvas来采样颜色
+    const tempCanvas = document.createElement('canvas')
+    const tempCtx = tempCanvas.getContext('2d')
+    if (!tempCtx) return null
+
+    // 设置canvas尺寸为图片尺寸
+    tempCanvas.width = img.naturalWidth
+    tempCanvas.height = img.naturalHeight
+
+    // 绘制图片到临时canvas
+    tempCtx.drawImage(img, 0, 0)
+
+    // 计算在原始图片中的坐标
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop
+
+    // 计算在页面中的绝对坐标（包含滚动）
+    const absoluteX = x + scrollX
+    const absoluteY = y + scrollY
+
+    // 计算在原始图片中的坐标
+    const pageWidth = document.documentElement.scrollWidth || window.innerWidth
+    const pageHeight = document.documentElement.scrollHeight || window.innerHeight
+    const scaleX = img.naturalWidth / pageWidth
+    const scaleY = img.naturalHeight / pageHeight
+
+    const imageX = Math.floor(absoluteX * scaleX)
+    const imageY = Math.floor(absoluteY * scaleY)
+
+    // 确保坐标在图片范围内
+    if (imageX < 0 || imageX >= img.naturalWidth || imageY < 0 || imageY >= img.naturalHeight) {
+      return null
+    }
+
+    // 获取像素数据
+    const imageData = tempCtx.getImageData(imageX, imageY, 1, 1)
+    const [r, g, b, a] = imageData.data
+
+    if (a === 0) return null // 透明像素
+
+    const color = rgbToHex(`rgb(${r}, ${g}, ${b})`)
+    return color
+  } catch (error) {
+    console.error('[DraftPaper] Error getting actual pixel color:', error)
+    return null
+  }
+}
+
+/**
+ * 同步获取指定位置的颜色
+ */
+
+/**
+ * 添加放大镜十字准星
+ */
+function addMagnifierCrosshair(ctx: CanvasRenderingContext2D, size: number): void {
+  const centerX = size / 2
+  const centerY = size / 2
+
+  // 绘制十字准星
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'
+  ctx.lineWidth = 1
+
+  // 水平线
+  ctx.beginPath()
+  ctx.moveTo(0, centerY)
+  ctx.lineTo(size, centerY)
+  ctx.stroke()
+
+  // 垂直线
+  ctx.beginPath()
+  ctx.moveTo(centerX, 0)
+  ctx.lineTo(centerX, size)
+  ctx.stroke()
+
+  // 中心点（更小更精确）
+  ctx.fillStyle = '#ff0000'
+  ctx.fillRect(centerX - 0.5, centerY - 0.5, 1, 1)
+}
+
+/**
+ * 添加放大镜覆盖层
+ */
+function addMagnifierOverlays(container: HTMLElement, _size: number): void {
+  // 添加十字准星覆盖层
+  const crosshairOverlay = document.createElement('div')
+  crosshairOverlay.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  `
+  crosshairOverlay.innerHTML = `
+    <div style="
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: rgba(255, 0, 0, 0.8);
+      transform: translateY(-50%);
+    "></div>
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 1px;
+      height: 100%;
+      background: rgba(255, 0, 0, 0.8);
+      transform: translateX(-50%);
+    "></div>
+    <div style="
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 2px;
+      height: 2px;
+      background: #333333;
+      transform: translate(-50%, -50%);
+    "></div>
+  `
+  container.appendChild(crosshairOverlay)
+
+  // 添加边框
+  const border = document.createElement('div')
+  border.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 2px solid #333333;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 10;
+  `
+  container.appendChild(border)
+}
+
+/**
+ * 处理颜色点击
+ * @param event - 点击事件
+ */
+async function handleColorClick(event: MouseEvent): Promise<void> {
+  try {
+    if (!isColorPickerActive) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const { clientX, clientY } = event
+
+    // 获取点击位置的颜色（使用与放大镜相同的实际像素颜色）
+    if (pageScreenshot) {
+      // 从截图中获取实际像素颜色
+      const img = new Image()
+      img.onload = () => {
+        const captureSize = 150 / 12 // 放大镜大小 / 缩放因子
+        const captureX = clientX - captureSize / 2
+        const captureY = clientY - captureSize / 2
+
+        const actualPixelColor = getActualPixelColorFromScreenshot(
+          img,
+          clientX,
+          clientY,
+          captureX,
+          captureY,
+          12
+        )
+        console.log(
+          '[DraftPaper] Click color from actual pixel:',
+          actualPixelColor,
+          'at position:',
+          {
+            clientX,
+            clientY,
+            captureX,
+            captureY,
+          }
+        )
+        if (actualPixelColor) {
+          // 复制到剪贴板
+          copyToClipboard(actualPixelColor).then((success) => {
+            if (success) {
+              // eslint-disable-next-line no-console
+              console.info(`🎨 实际像素色值已复制到剪贴板: ${actualPixelColor}`)
+
+              // 显示通知
+              showColorNotification(actualPixelColor)
+            } else {
+              errorHandler(new Error('色值复制失败'))
+            }
+          })
+        } else {
+          console.warn('[DraftPaper] 无法获取实际像素颜色')
+        }
+      }
+      img.src = pageScreenshot
+    } else {
+      // 如果没有截图，提示用户
+      console.warn('[DraftPaper] 没有页面截图，无法获取实际像素颜色')
+      showColorNotification('请先开启取色器')
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 将RGB颜色转换为十六进制
+ * @param rgb - RGB颜色字符串
+ * @returns 十六进制颜色值
+ */
+function rgbToHex(rgb: string): string {
+  try {
+    const match = rgb.match(/\d+/g)
+    if (match && match.length >= 3) {
+      const r = parseInt(match[0])
+      const g = parseInt(match[1])
+      const b = parseInt(match[2])
+      return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`
+    }
+    return '#000000'
+  } catch {
+    return '#000000'
+  }
+}
+
+/**
+ * 显示颜色通知
+ * @param color - 颜色值
+ */
+function showColorNotification(color: string): void {
+  try {
+    // 创建通知元素
+    const notification = document.createElement('div')
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 1000002;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `
+
+    // 添加颜色预览
+    const colorPreview = document.createElement('div')
+    colorPreview.style.cssText = `
+      width: 20px;
+      height: 20px;
+      background: ${color};
+      border-radius: 3px;
+      border: 1px solid #fff;
+    `
+
+    notification.appendChild(colorPreview)
+    notification.appendChild(document.createTextNode(`${color} 色值已保存在剪贴板中`))
+
+    document.body.appendChild(notification)
+
+    // 3秒后自动移除
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification)
+      }
+    }, 3000)
   } catch (error) {
     errorHandler(error as Error)
   }
