@@ -11,7 +11,8 @@
 
     <div class="setting-description">
       <p>
-        模板中的 <code>{top}</code> 和 <code>{left}</code> 将被替换为元素拖拽后的位置值，
+        模板中的 <code>{top}</code>、<code>{left}</code>、<code>{selector}</code> 将被替换为
+        拖拽后的 <code>top</code>/<code>left</code> 数值和所点击元素的 <code>CSS 选择器链</code>，
         并自动复制到剪贴板。
       </p>
       <p class="default-template">
@@ -36,7 +37,7 @@
         </div>
 
         <div class="help-text">
-          <p>💡 建议在模板中使用 {top} 和 {left} 占位符来获取拖拽位置</p>
+          <p>💡 建议使用 {top}、{left}、{selector} 获取位置与选择器</p>
           <p>🎯 支持任何格式的代码模板，完全自由定制</p>
           <p>🔒 系统会自动移除潜在的恶意代码以确保安全</p>
         </div>
@@ -83,7 +84,10 @@ const previewCode = computed(() => {
   if (!templateCode.value || hasError.value) return ''
 
   try {
-    return templateCode.value.replace(/\{top\}/gi, '20').replace(/\{left\}/gi, '100')
+    return templateCode.value
+      .replace(/\{top\}/gi, '20')
+      .replace(/\{left\}/gi, '100')
+      .replace(/\{selector\}/gi, 'div.container > ul.list > li.item:nth-child(2) > a.link')
   } catch {
     return ''
   }

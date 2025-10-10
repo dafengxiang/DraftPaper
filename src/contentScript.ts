@@ -28,8 +28,13 @@ const dragState: DragState = {
   element: null,
 }
 
+// 文档点击监听是否已挂载，防止重复添加导致多次打印
+let isClickListenerAttached = false
+
 // 当前模板代码
 let currentTemplateCode = APP_CONFIG.defaultTemplate
+// 当前点击元素的选择器链（清洗后）
+let currentSelectorChain = ''
 
 /**
  * 初始化内容脚本
@@ -242,9 +247,15 @@ function drawDraft(draftInfo: {
 function handleElementDrag(isEnabled: boolean): void {
   try {
     if (isEnabled) {
-      document.addEventListener('click', handleElementClick, true)
+      if (!isClickListenerAttached) {
+        document.addEventListener('click', handleElementClick, true)
+        isClickListenerAttached = true
+      }
     } else {
-      document.removeEventListener('click', handleElementClick, true)
+      if (isClickListenerAttached) {
+        document.removeEventListener('click', handleElementClick, true)
+        isClickListenerAttached = false
+      }
       clearDragState()
     }
   } catch (error) {
@@ -289,6 +300,21 @@ function handleElementClick(event: Event): void {
     // 阻止事件传播
     event.stopPropagation()
     event.preventDefault()
+
+    // 打印被点击元素的选择器
+    try {
+      const selector = getElementSelector(target)
+      // eslint-disable-next-line no-console
+      console.info('[DraftPaper] clicked selector:', selector)
+      const chain = sanitizeSelector(getSelectorChain(target, 6))
+      if (chain) {
+        // eslint-disable-next-line no-console
+        console.info('[DraftPaper] selector chain:', chain)
+        currentSelectorChain = chain
+      }
+    } catch (_e) {
+      // ignore selector errors
+    }
 
     // 清理之前选中的元素
     clearDragState()
@@ -379,6 +405,9 @@ async function handleTouchEnd(_event: TouchEvent): Promise<void> {
 
     dragState.isDragging = false
 
+    // 在复制前刷新最新模板，避免消息不同步导致使用旧模板
+    await refreshTemplateFromDB()
+
     // 计算最终位置
     const deltaX = Math.round((dragState.currentX - dragState.startX) / widthRatio)
     const deltaY = Math.round((dragState.currentY - dragState.startY) / widthRatio)
@@ -391,8 +420,7 @@ async function handleTouchEnd(_event: TouchEvent): Promise<void> {
 
     if (success) {
       // eslint-disable-next-line no-console
-      console.info('位置代码已复制:', code)
-      showCopyNotification()
+      console.info('✅ 模版已复制到剪贴板:', code)
     } else {
       errorHandler(new Error('复制失败'))
     }
@@ -416,21 +444,139 @@ function generatePositionCode(deltaX: number, deltaY: number): string {
     return safeTemplate
       .replace(/\{top\}/gi, deltaY.toString())
       .replace(/\{left\}/gi, deltaX.toString())
+      .replace(/\{selector\}/gi, currentSelectorChain || '')
   } catch (error) {
     errorHandler(error as Error)
     return APP_CONFIG.defaultTemplate
       .replace(/\{top\}/gi, deltaY.toString())
       .replace(/\{left\}/gi, deltaX.toString())
+      .replace(/\{selector\}/gi, currentSelectorChain || '')
   }
 }
 
 /**
- * 显示复制成功通知
+ * 获取元素的单节点 CSS 选择器（不包含祖先）
  */
-function showCopyNotification(): void {
-  // 可以添加视觉反馈，比如toast消息
-  // eslint-disable-next-line no-console
-  console.log('✅ 位置代码已复制到剪贴板')
+function getElementSelector(element: Element): string {
+  if (!(element instanceof Element)) return ''
+  if (element.id) return `#${cssEscape(element.id)}`
+  return buildNodeSelector(element)
+}
+
+function buildNodeSelector(node: Element): string {
+  const tag = node.tagName.toLowerCase()
+
+  // 使用类名（最多两个，避免过长）
+  const classList = Array.from(node.classList).slice(0, 2)
+  if (classList.length) {
+    const base = `${tag}.${classList.map((c) => cssEscape(c)).join('.')}`
+    const parent = node.parentElement
+    if (!parent) return base
+    // 如果同级存在相同 tag+classes，则加 :nth-child
+    const siblings = Array.from(parent.children) as Element[]
+    const same = siblings.filter(
+      (el) =>
+        el.tagName.toLowerCase() === tag &&
+        classList.every((c) => (el as Element).classList.contains(c))
+    )
+    if (same.length > 1) {
+      const index = siblings.indexOf(node) + 1
+      return `${base}:nth-child(${index})`
+    }
+    return base
+  }
+
+  // 退化到 nth-child
+  const parent = node.parentElement
+  if (!parent) return tag
+  const children = Array.from(parent.children)
+  const index = children.indexOf(node) + 1
+  return `${tag}:nth-child(${index})`
+}
+
+function cssEscape(text: string): string {
+  return text
+    .replace(/"/g, '\\"')
+    .replace(/\n|\r|\t/g, ' ')
+    .replace(/([!"#$%&'()*+,./:;<=>?@\[\]^`{|}~])/g, '\\$1')
+}
+
+/**
+ * 获取上级（祖先）元素的选择器列表
+ * @param element 目标元素
+ * @param maxDepth 最多向上追溯层级
+ * @returns 由近到远的祖先选择器数组
+ */
+function getAncestorSelectors(element: Element, maxDepth = 5): string[] {
+  const selectors: string[] = []
+  let current: Element | null = element.parentElement
+  let depth = 0
+
+  while (current && depth < maxDepth && current !== document.body) {
+    try {
+      const sel = current.id ? `#${cssEscape(current.id)}` : buildNodeSelector(current)
+      if (sel) selectors.push(sel)
+    } catch (_e) {
+      // ignore
+    }
+    current = current.parentElement
+    depth += 1
+  }
+
+  return selectors
+}
+
+/**
+ * 获取祖先到目标的选择器链（以 ' > ' 连接）
+ */
+function getSelectorChain(element: Element, maxDepth = 5): string {
+  const parts: string[] = []
+  const parents = getAncestorSelectors(element, maxDepth)
+  if (parents.length) parts.push(...parents.reverse())
+  const self = getElementSelector(element)
+  if (self) parts.push(self)
+  return parts.join(' > ')
+}
+
+/**
+ * 从数据库刷新当前模板，确保使用最新的自定义模板
+ */
+async function refreshTemplateFromDB(): Promise<void> {
+  try {
+    const dbKey = generateDbKey(new URL(location.href))
+    const message: ChromeMessage = {
+      type: 'GET_DRAFTS' as MessageType,
+      payload: { dbKey },
+    }
+    await new Promise<void>((resolve) => {
+      chrome.runtime.sendMessage(message, (response: ChromeResponse) => {
+        try {
+          if (chrome.runtime.lastError) {
+            resolve()
+            return
+          }
+          if (response && response.draftsInfo) {
+            draftInfoCache = response.draftsInfo
+            const info: DraftsInfo = JSON.parse(response.draftsInfo)
+            currentTemplateCode = info.templateCode || APP_CONFIG.defaultTemplate
+          }
+        } catch (_e) {
+          // ignore
+        }
+        resolve()
+      })
+    })
+  } catch (_error) {
+    // ignore
+  }
+}
+
+/**
+ * 移除属性选择器，仅保留标签与类名（以及 :nth-child）
+ */
+function sanitizeSelector(selector: string): string {
+  // 去除所有 [attr=...] 片段
+  return selector.replace(/\[[^\]]*\]/g, '')
 }
 
 /**
