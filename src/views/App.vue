@@ -433,24 +433,10 @@ onUnmounted(() => {
   }
 
   .d-color-picker-btn {
-    background: #ff9900;
-    border-radius: 50%;
-    position: relative;
-    font-size: 14px;
-    color: #000;
-    font-weight: bold;
-
-    &::before {
-      content: '🎨';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-    }
+    background: url('../icons/color_disabled.png') no-repeat center / contain;
 
     &.active {
-      background: #00ff00;
-      box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+      background-image: url('../icons/color.png');
     }
   }
 

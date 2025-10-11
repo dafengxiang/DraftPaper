@@ -249,7 +249,7 @@ function drawDraft(draftInfo: {
       top: ${top * widthRatio}px;
       left: ${left * widthRatio}px;
       opacity: ${opacity};
-      position: absolute;
+      position: fixed;
       z-index: ${Z_INDEX.draftImage};
       pointer-events: none;
       user-select: none;
@@ -939,11 +939,14 @@ async function createDOMScreenshot(): Promise<string | null> {
       background: white;
     `
 
-    // 移除干扰元素
-    const elementsToRemove = clonedBody.querySelectorAll(
-      '.draft-paper-magnifier, script, style, [style*="position: fixed"]'
-    )
-    elementsToRemove.forEach((el) => el.remove())
+    // 移除干扰元素（排除草稿纸图片）
+    const elementsToRemove = clonedBody.querySelectorAll('.draft-paper-magnifier, script, style')
+    elementsToRemove.forEach((el) => {
+      // 确保不移除草稿纸图片
+      if (el.id !== 'draft-paper-image' && !el.classList.contains('draft-paper-image')) {
+        el.remove()
+      }
+    })
 
     // 创建临时容器
     const tempContainer = document.createElement('div')
