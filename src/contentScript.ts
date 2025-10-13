@@ -693,8 +693,6 @@ function handleColorPickerToggle(isActive: boolean, opacity: number): void {
 
     isColorPickerActive = isActive
 
-    // 保留自研方案作为唯一实现
-
     if (isActive) {
       // 保存当前透明度
       if (draftImgDom) {
