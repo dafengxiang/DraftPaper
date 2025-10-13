@@ -1132,7 +1132,7 @@ function createMagnifier(): void {
       z-index: 1000001;
       display: none;
       overflow: hidden;
-      box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
     `
 
     // 创建放大镜内容容器
@@ -1507,26 +1507,20 @@ function updateMagnifierContent(x: number, y: number): void {
           const centerY = magnifierSize / 2
           const gridSize = zoomFactor
 
-          // 绘制中心像素
+          // 计算中心像素位置，使其与偏移后的网格对齐
+          // 网格线向左上偏移了4像素，所以中心像素也需要相应调整
+          const pixelX = Math.floor(centerX / gridSize) * gridSize - 4
+          const pixelY = Math.floor(centerY / gridSize) * gridSize - 4
+
+          // 绘制中心像素（完整的网格像素）
           ctx.fillStyle = centerColor
-          ctx.fillRect(centerX - gridSize / 2, centerY - gridSize / 2, gridSize, gridSize)
+          ctx.fillRect(pixelX, pixelY, gridSize, gridSize)
 
-          // 绘制颜色边框
+          // 绘制颜色边框（与网格线对齐）
           ctx.strokeStyle = '#000000'
-          ctx.lineWidth = 1
-          ctx.strokeRect(centerX - gridSize / 2, centerY - gridSize / 2, gridSize, gridSize)
-
-          // 绘制颜色值文本（这就是剪切板中会复制的颜色）
-          ctx.fillStyle = '#000000'
-          ctx.font = 'bold 10px Arial'
-          ctx.textAlign = 'center'
-          ctx.fillText(centerColor, centerX, centerY + 25)
+          ctx.lineWidth = 2
+          ctx.strokeRect(pixelX, pixelY, gridSize, gridSize)
         }
-
-        // 高亮中心像素（已移除红色边框）
-
-        // 添加十字准星
-        addMagnifierCrosshair(ctx, magnifierSize)
       }
       img.src = pageScreenshot
     } else {
@@ -1542,9 +1536,6 @@ function updateMagnifierContent(x: number, y: number): void {
     }
 
     magnifierContent.appendChild(canvas)
-
-    // 添加边框
-    addMagnifierOverlays(magnifierContent, magnifierSize)
   } catch (error) {
     errorHandler(error as Error)
   }
@@ -1556,18 +1547,19 @@ function updateMagnifierContent(x: number, y: number): void {
 function drawMagnifierGrid(ctx: CanvasRenderingContext2D, size: number, pixelSize: number): void {
   // 绘制细网格线（像素边界）
   ctx.strokeStyle = '#666666'
-  ctx.lineWidth = 0.8
+  ctx.lineWidth = 0.5
   ctx.globalAlpha = 0.7
 
-  for (let i = 0; i <= size; i += pixelSize) {
+  // 绘制网格线，向左上偏移0.5像素，让中心像素显示为完整的网格
+  for (let i = 0; i < size; i += pixelSize) {
     ctx.beginPath()
-    ctx.moveTo(i, 0)
-    ctx.lineTo(i, size)
+    ctx.moveTo(i - 4, 0)
+    ctx.lineTo(i - 4, size)
     ctx.stroke()
 
     ctx.beginPath()
-    ctx.moveTo(0, i)
-    ctx.lineTo(size, i)
+    ctx.moveTo(0, i - 4)
+    ctx.lineTo(size, i - 4)
     ctx.stroke()
   }
 
@@ -1638,96 +1630,6 @@ function getActualPixelColorFromScreenshot(
 /**
  * 同步获取指定位置的颜色
  */
-
-/**
- * 添加放大镜十字准星
- */
-function addMagnifierCrosshair(ctx: CanvasRenderingContext2D, size: number): void {
-  const centerX = size / 2
-  const centerY = size / 2
-
-  // 绘制十字准星
-  ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'
-  ctx.lineWidth = 1
-
-  // 水平线
-  ctx.beginPath()
-  ctx.moveTo(0, centerY)
-  ctx.lineTo(size, centerY)
-  ctx.stroke()
-
-  // 垂直线
-  ctx.beginPath()
-  ctx.moveTo(centerX, 0)
-  ctx.lineTo(centerX, size)
-  ctx.stroke()
-
-  // 中心点（更小更精确）
-  ctx.fillStyle = '#ff0000'
-  ctx.fillRect(centerX - 0.5, centerY - 0.5, 1, 1)
-}
-
-/**
- * 添加放大镜覆盖层
- */
-function addMagnifierOverlays(container: HTMLElement, _size: number): void {
-  // 添加十字准星覆盖层
-  const crosshairOverlay = document.createElement('div')
-  crosshairOverlay.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 10;
-  `
-  crosshairOverlay.innerHTML = `
-    <div style="
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      height: 1px;
-      background: rgba(255, 0, 0, 0.8);
-      transform: translateY(-50%);
-    "></div>
-    <div style="
-      position: absolute;
-      top: 0;
-      left: 50%;
-      width: 1px;
-      height: 100%;
-      background: rgba(255, 0, 0, 0.8);
-      transform: translateX(-50%);
-    "></div>
-    <div style="
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 2px;
-      height: 2px;
-      background: #333333;
-      transform: translate(-50%, -50%);
-    "></div>
-  `
-  container.appendChild(crosshairOverlay)
-
-  // 添加边框
-  const border = document.createElement('div')
-  border.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: 2px solid #333333;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 10;
-  `
-  container.appendChild(border)
-}
 
 /**
  * 处理颜色点击
