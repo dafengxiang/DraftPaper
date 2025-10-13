@@ -14,22 +14,28 @@
         <button
           v-if="!isLoading"
           class="d-handle-btn"
-          :class="{ disabled: !draftsInfo.isCanPick }"
-          :title="draftsInfo.isCanPick ? '点击关闭拖拽模式' : '点击开启拖拽模式'"
-          @click="draftsInfo.isCanPick = !draftsInfo.isCanPick"
+          :class="{ active: !isAI && !isSetting, disabled: isAI }"
+          :title="isAI ? 'AI检测中（图标置灰），点击返回主面板并开启拖拽' : '回到主面板并开启拖拽'"
+          @click="onToggleDrag()"
         ></button>
-        <button
+        <!-- <button
           v-if="!isLoading && hasDraft"
           class="d-color-picker-btn"
           :class="{ active: isColorPickerActive }"
           :title="isColorPickerActive ? '关闭取色器' : '开启取色器'"
           @click="toggleColorPicker"
+        ></button> -->
+        <button
+          class="d-ai-btn"
+          :class="{ active: isAI }"
+          :title="isAI ? '退出AI检测' : '打开AI检测'"
+          @click="onToggleAI()"
         ></button>
         <button
           class="d-setting-btn"
-          :class="{ disabled: !isSetting }"
-          :title="isSetting ? '退出设置' : '打开设置'"
-          @click="isSetting = !isSetting"
+          :class="{ active: isSetting }"
+          :title="isSetting ? '当前：设置' : '打开设置'"
+          @click="onToggleSetting()"
         ></button>
       </div>
     </header>
@@ -50,6 +56,7 @@
     <main v-else class="main-content">
       <!-- 设置面板 -->
       <SettingBox v-if="isSetting" />
+      <AICheckBox v-else-if="isAI" />
       <template v-else>
         <!-- 草稿列表 -->
         <DraftList />
@@ -71,11 +78,33 @@ import { DEBOUNCE_DELAY } from '@/config/constants'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
 import SettingBox from './SettingBox.vue'
+import AICheckBox from './AICheckBox.vue'
 
 const errorHandler = createErrorHandler('App')
 
 // 组件状态
 const isSetting = ref(false)
+const isAI = ref(false)
+function onToggleDrag(): void {
+  // 回主面板并开启拖拽
+  isAI.value = false
+  isSetting.value = false
+  draftsInfo.value.isCanPick = true
+}
+
+function onToggleAI(): void {
+  // 打开AI面板并关闭拖拽
+  isAI.value = true
+  isSetting.value = false
+  draftsInfo.value.isCanPick = false
+}
+
+function onToggleSetting(): void {
+  // 打开设置并关闭拖拽、AI
+  isSetting.value = true
+  isAI.value = false
+  draftsInfo.value.isCanPick = false
+}
 const isLoading = ref(true)
 const errorMessage = ref('')
 const isColorPickerActive = ref(false)
@@ -409,6 +438,7 @@ onUnmounted(() => {
 
   .d-handle-btn,
   .d-color-picker-btn,
+  .d-ai-btn,
   .d-setting-btn {
     .square(25px);
     border: none;
@@ -437,6 +467,14 @@ onUnmounted(() => {
 
     &.active {
       background-image: url('../icons/color.png');
+    }
+  }
+
+  .d-ai-btn {
+    background: url('../icons/ai_disabled.png') no-repeat center / contain;
+
+    &.active {
+      background-image: url('../icons/ai.png');
     }
   }
 
