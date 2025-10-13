@@ -772,8 +772,6 @@ function handleColorPickerToggle(isActive: boolean, opacity: number): void {
       if (draftImgDom) {
         const restoreOpacity = opacity > 0 ? opacity : originalOpacity || 1
         draftImgDom.style.opacity = restoreOpacity.toString()
-        // eslint-disable-next-line no-console
-        console.log('[DraftPaper] Draft image opacity restored to:', restoreOpacity)
       }
 
       // 解锁页面滚动
@@ -849,7 +847,6 @@ function unlockPageScroll(): void {
     document.body.style.width = ''
 
     isScrollLocked = false
-    console.log('[DraftPaper] Page scroll unlocked')
   } catch (error) {
     console.error('[DraftPaper] Error unlocking page scroll:', error)
   }
@@ -1169,8 +1166,6 @@ function removeMagnifier(): void {
       // 移除放大镜元素
       magnifierElement.remove()
       magnifierElement = null
-
-      console.log('[DraftPaper] Magnifier removed')
     }
   } catch (error) {
     errorHandler(error as Error)
