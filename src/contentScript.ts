@@ -325,8 +325,6 @@ function handleElementClick(event: Event): void {
     // 打印被点击元素的选择器
     try {
       const selector = getElementSelector(target)
-      // eslint-disable-next-line no-console
-      console.info('[DraftPaper] clicked selector:', selector)
       const chain = sanitizeSelector(getSelectorChain(target, 6))
       if (chain) {
         // eslint-disable-next-line no-console
@@ -695,11 +693,7 @@ function handleColorPickerToggle(isActive: boolean, opacity: number): void {
 
     isColorPickerActive = isActive
 
-    // 优先使用原生 EyeDropper（更精准、更简洁）
-    if (isActive && (window as any).EyeDropper) {
-      startEyeDropper(opacity)
-      return
-    }
+    // 保留自研方案作为唯一实现
 
     if (isActive) {
       // 保存当前透明度
@@ -1154,58 +1148,6 @@ function createMagnifier(): void {
     document.body.appendChild(magnifierElement)
   } catch (error) {
     errorHandler(error as Error)
-  }
-}
-
-/**
- * 使用原生 EyeDropper 取色（优先方案）
- */
-async function startEyeDropper(opacity: number): Promise<void> {
-  try {
-    // 关闭拖拽，避免交互冲突
-    try {
-      const info: DraftsInfo | null = draftInfoCache ? JSON.parse(draftInfoCache) : null
-      if (info) {
-        handleElementDrag(false)
-      }
-    } catch (_e) {
-      // ignore
-      handleElementDrag(false)
-    }
-
-    // 记录并提升草稿透明度至100%
-    if (draftImgDom) {
-      originalOpacity = parseFloat(draftImgDom.style.opacity) || 1
-      draftImgDom.style.opacity = '1'
-    }
-
-    // 打开原生取色器
-    const eyeDropper = new (window as any).EyeDropper()
-    const result = await eyeDropper.open()
-    const hex: string = (result?.sRGBHex || '').toUpperCase()
-    if (hex) {
-      await copyToClipboard(hex)
-      showColorNotification(hex)
-    }
-  } catch (_err) {
-    // 用户取消或不支持，静默处理，回退逻辑已在调用处
-  } finally {
-    // 关闭取色状态并恢复环境
-    isColorPickerActive = false
-    unlockPageScroll()
-    if (draftImgDom) {
-      const restore = opacity > 0 ? opacity : originalOpacity || 1
-      draftImgDom.style.opacity = restore.toString()
-    }
-    originalOpacity = null
-
-    // 恢复拖拽
-    try {
-      const info: DraftsInfo | null = draftInfoCache ? JSON.parse(draftInfoCache) : null
-      handleElementDrag(!!info?.isCanPick)
-    } catch {
-      handleElementDrag(false)
-    }
   }
 }
 
@@ -1719,24 +1661,11 @@ async function handleColorClick(event: MouseEvent): Promise<void> {
           captureY,
           12
         )
-        console.log(
-          '[DraftPaper] Click color from actual pixel:',
-          actualPixelColor,
-          'at position:',
-          {
-            clientX,
-            clientY,
-            captureX,
-            captureY,
-          }
-        )
+
         if (actualPixelColor) {
           // 复制到剪贴板
           copyToClipboard(actualPixelColor).then((success) => {
             if (success) {
-              // eslint-disable-next-line no-console
-              console.info(`🎨 实际像素色值已复制到剪贴板: ${actualPixelColor}`)
-
               // 显示通知
               showColorNotification(actualPixelColor)
             } else {

@@ -19,19 +19,7 @@ declare global {
   interface Window {
     $currentTab?: chrome.tabs.Tab
     $currentUrl?: URL
-    EyeDropper?: typeof EyeDropper
   }
-}
-
-// 原生 EyeDropper API 类型声明（简化）
-interface EyeDropperResult {
-  sRGBHex: string
-}
-interface EyeDropperOptions {
-  signal?: AbortSignal
-}
-declare class EyeDropper {
-  open(options?: EyeDropperOptions): Promise<EyeDropperResult>
 }
 
 export {}
