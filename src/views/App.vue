@@ -9,14 +9,14 @@
   <div class="m-extension-popup">
     <!-- 标题栏 -->
     <header class="header">
-      <h3 class="title">DraftPaper</h3>
+      <h3 class="title"></h3>
       <div class="controls">
         <button
           v-if="!isLoading"
           class="d-handle-btn"
           :class="{ disabled: !draftsInfo.isCanPick }"
           :title="draftsInfo.isCanPick ? '点击关闭拖拽模式' : '点击开启拖拽模式'"
-          @click="draftsInfo.isCanPick = !draftsInfo.isCanPick"
+          @click="handleTogglePick()"
         ></button>
         <!-- <button
           v-if="!isLoading && hasDraft"
@@ -90,6 +90,12 @@ function onToggleAI(): void {
   // 打开AI面板并关闭拖拽
   isAI.value = true
   isSetting.value = false
+}
+
+function handleTogglePick(): void {
+  draftsInfo.value.isCanPick = !draftsInfo.value.isCanPick
+  isSetting.value = false
+  isAI.value = false
 }
 
 const isLoading = ref(true)
@@ -412,10 +418,9 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   .title {
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0;
-    color: #fff;
+    width: 180px;
+    height: 36px;
+    background: url('../icons/title.png') no-repeat center / contain;
   }
 
   .controls {
