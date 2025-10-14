@@ -31,6 +31,9 @@
           :title="isAI ? '退出AI检测' : '打开AI检测'"
           @click="onToggleAI()"
         ></button>
+
+        <button class="d-review-btn" title="线上UI审查"></button>
+
         <button
           class="d-setting-btn"
           :class="{ disabled: !isSetting }"
@@ -418,8 +421,8 @@ onUnmounted(() => {
   flex-shrink: 0;
 
   .title {
-    width: 180px;
-    height: 36px;
+    width: 160px;
+    height: 32px;
     background: url('../icons/title.png') no-repeat center / contain;
   }
 
@@ -431,8 +434,9 @@ onUnmounted(() => {
   .d-handle-btn,
   .d-color-picker-btn,
   .d-ai-btn,
+  .d-review-btn,
   .d-setting-btn {
-    .square(25px);
+    .square(22px);
     border: none;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -468,6 +472,10 @@ onUnmounted(() => {
     &.active {
       background-image: url('../icons/ai.png');
     }
+  }
+
+  .d-review-btn {
+    background: url('../icons/review.png') no-repeat center / contain;
   }
 
   .d-setting-btn {
