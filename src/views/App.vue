@@ -14,9 +14,9 @@
         <button
           v-if="!isLoading"
           class="d-handle-btn"
-          :class="{ active: !isAI && !isSetting, disabled: isAI }"
-          :title="isAI ? 'AI检测中（图标置灰），点击返回主面板并开启拖拽' : '回到主面板并开启拖拽'"
-          @click="onToggleDrag()"
+          :class="{ disabled: !draftsInfo.isCanPick }"
+          :title="draftsInfo.isCanPick ? '点击关闭拖拽模式' : '点击开启拖拽模式'"
+          @click="draftsInfo.isCanPick = !draftsInfo.isCanPick"
         ></button>
         <!-- <button
           v-if="!isLoading && hasDraft"
@@ -27,15 +27,15 @@
         ></button> -->
         <button
           class="d-ai-btn"
-          :class="{ active: isAI }"
+          :class="{ active: isAI && !isSetting }"
           :title="isAI ? '退出AI检测' : '打开AI检测'"
           @click="onToggleAI()"
         ></button>
         <button
           class="d-setting-btn"
-          :class="{ active: isSetting }"
-          :title="isSetting ? '当前：设置' : '打开设置'"
-          @click="onToggleSetting()"
+          :class="{ disabled: !isSetting }"
+          :title="isSetting ? '退出设置' : '打开设置'"
+          @click="isSetting = !isSetting"
         ></button>
       </div>
     </header>
@@ -85,26 +85,13 @@ const errorHandler = createErrorHandler('App')
 // 组件状态
 const isSetting = ref(false)
 const isAI = ref(false)
-function onToggleDrag(): void {
-  // 回主面板并开启拖拽
-  isAI.value = false
-  isSetting.value = false
-  draftsInfo.value.isCanPick = true
-}
 
 function onToggleAI(): void {
   // 打开AI面板并关闭拖拽
   isAI.value = true
   isSetting.value = false
-  draftsInfo.value.isCanPick = false
 }
 
-function onToggleSetting(): void {
-  // 打开设置并关闭拖拽、AI
-  isSetting.value = true
-  isAI.value = false
-  draftsInfo.value.isCanPick = false
-}
 const isLoading = ref(true)
 const errorMessage = ref('')
 const isColorPickerActive = ref(false)
