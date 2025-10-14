@@ -10,7 +10,8 @@ export const APP_CONFIG: AppConfig = {
     left: 0,
     opacity: 1,
   },
-  defaultTemplate: 'position: absolute; top: {top}px; left: {left}px;',
+  defaultTemplate:
+    '你是一个资深前端开发，修改{selector}元素的css，基于当前css中定位方式，最小程度修改，元素下移{top}px，右移{left}px',
   popupWidth: 350,
   maxImageSize: 5 * 1024 * 1024, // 5MB
   supportedImageTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
