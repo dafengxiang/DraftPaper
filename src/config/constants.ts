@@ -10,7 +10,8 @@ export const APP_CONFIG: AppConfig = {
     left: 0,
     opacity: 1,
   },
-  defaultTemplate: `资深前端开发：仅修改{selector}匹配元素的CSS，实现下移{top}px、右移{left}px。
+  defaultTemplate: `你是一位负责页面样式修正的前端专家。
+请修改{selector}匹配元素的CSS，实现下移{top}px、右移{left}px。
 规则：
 1. 严格基于该元素当前定位方式（不改动定位属性）；
 2. relative/absolute/fixed/sticky：叠加/新增top/left；static：仅调margin-top/margin-left；
