@@ -99,6 +99,12 @@ const common = {
           from: '**/*',
           context: 'public',
         },
+        // 复制 src/icons 下的所有静态资源到 build/assets，供扩展页面通过 chrome.runtime.getURL 访问
+        {
+          from: PATHS.src + '/icons/**/*',
+          to: 'assets/[name][ext]',
+          noErrorOnMissing: true,
+        },
       ],
     }),
     // Extract CSS into separate files

@@ -1,9 +1,9 @@
-'use strict';
+'use strict'
 
-const { merge } = require('webpack-merge');
+const { merge } = require('webpack-merge')
 
-const common = require('./webpack.common.js');
-const PATHS = require('./paths');
+const common = require('./webpack.common.js')
+const PATHS = require('./paths')
 
 // Merge webpack configuration files
 const config = merge(common, {
@@ -11,7 +11,8 @@ const config = merge(common, {
     popup: PATHS.src + '/popup.ts',
     contentScript: PATHS.src + '/contentScript.ts',
     background: PATHS.src + '/background.ts',
+    review: PATHS.src + '/review.ts',
   },
-});
+})
 
-module.exports = config;
+module.exports = config

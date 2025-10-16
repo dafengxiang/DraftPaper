@@ -32,7 +32,7 @@
           @click="onToggleAI()"
         ></button>
 
-        <button class="d-review-btn" title="线上UI审查"></button>
+        <button class="d-review-btn" title="线上UI审查" @click="openReviewPage"></button>
 
         <button
           class="d-setting-btn"
@@ -93,6 +93,16 @@ function onToggleAI(): void {
   // 打开AI面板并关闭拖拽
   isAI.value = true
   isSetting.value = false
+}
+
+function openReviewPage(): void {
+  try {
+    const url = chrome.runtime.getURL('review.html')
+    chrome.tabs.create({ url })
+    window.close()
+  } catch (error) {
+    errorHandler(error as Error)
+  }
 }
 
 function handleTogglePick(): void {
