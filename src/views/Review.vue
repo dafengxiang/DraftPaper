@@ -66,7 +66,7 @@ function extUrl(path: string): string {
   return path
 }
 
-const pageImgList = imageFileNames.map((n) => extUrl(`assets/${n}`))
+const pageImgList = imageFileNames.map((n) => extUrl(`assets/icons/${n}`))
 const currentIndex = ref(0)
 const status = ref<'waiting' | 'reviewing'>('waiting')
 const currentImage = computed(() => pageImgList[currentIndex.value] ?? '')
