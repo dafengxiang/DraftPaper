@@ -331,7 +331,7 @@ const toggleColorPicker = async (): Promise<void> => {
         type: 'TOGGLE_COLOR_PICKER' as const,
         payload: {
           isActive: isColorPickerActive.value,
-          opacity: isColorPickerActive.value ? 1 : currentDraft?.opacity || 1,
+          opacity: isColorPickerActive.value ? 1 : currentDraft?.opacity,
         },
       }
 

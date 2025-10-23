@@ -65,7 +65,7 @@ let dragMemory: DragMemory = {
 // 取色器状态
 let isColorPickerActive = false
 let magnifierElement: HTMLDivElement | null = null
-let originalOpacity: number | null = 1 // 保存原始透明度
+let originalOpacity: number | null = null // 保存原始透明度
 let pageScreenshot: string | null = null
 let isScrollLocked = false
 let isMemoryModeEnabled = false
@@ -189,7 +189,7 @@ function registerEventListeners(): void {
       if (request.type === 'UPDATE_DRAFTS') {
         handleDraft(request.payload.draftsInfo)
       } else if (request.type === 'TOGGLE_COLOR_PICKER') {
-        handleColorPickerToggle(request.payload.isActive || false, request.payload.opacity || 1)
+        handleColorPickerToggle(request.payload.isActive || false, request.payload.opacity)
       } else if (request.type === 'PING') {
         // 简单的ping响应，用于检查内容脚本是否可用
         sendResponse({ success: true, message: 'Content script is ready' })
@@ -930,7 +930,7 @@ function handleColorPickerToggle(isActive: boolean, opacity: number): void {
     if (isActive) {
       // 保存当前透明度
       if (draftImgDom) {
-        originalOpacity = parseFloat(draftImgDom.style.opacity) || 1
+        originalOpacity = parseFloat(draftImgDom.style.opacity)
         // 设置草稿图片透明度为100%
         draftImgDom.style.opacity = '1'
       }
@@ -1002,8 +1002,8 @@ function handleColorPickerToggle(isActive: boolean, opacity: number): void {
     } else {
       // 恢复草稿图片透明度
       if (draftImgDom) {
-        const restoreOpacity = opacity > 0 ? opacity : originalOpacity || 1
-        draftImgDom.style.opacity = restoreOpacity.toString()
+        const restoreOpacity = opacity > 0 ? opacity : originalOpacity
+        draftImgDom.style.opacity = restoreOpacity?.toString() || '0'
       }
 
       // 解锁页面滚动
