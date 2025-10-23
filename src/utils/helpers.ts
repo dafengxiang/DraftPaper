@@ -54,6 +54,15 @@ export function generateDbKey(url: URL): string {
 }
 
 /**
+ * 生成拖拽记忆数据库键
+ * @param url - URL对象
+ * @returns 拖拽记忆数据库键
+ */
+export function generateDragMemoryDbKey(url: URL): string {
+  return url.host + url.pathname + '_drag_memory'
+}
+
+/**
  * 压缩图片
  * @param file - 图片文件
  * @param quality - 压缩质量 0-1

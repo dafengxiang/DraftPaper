@@ -48,6 +48,13 @@ export enum MessageType {
   TOGGLE_COLOR_PICKER = 'TOGGLE_COLOR_PICKER',
   PING = 'PING',
   GET_COLOR_PICKER_STATE = 'GET_COLOR_PICKER_STATE',
+  TOGGLE_MEMORY_MODE = 'TOGGLE_MEMORY_MODE',
+  GET_DRAG_MEMORY = 'GET_DRAG_MEMORY',
+  ADD_DRAG_MEMORY = 'ADD_DRAG_MEMORY',
+  REMOVE_DRAG_MEMORY = 'REMOVE_DRAG_MEMORY',
+  CLEAR_DRAG_MEMORY = 'CLEAR_DRAG_MEMORY',
+  GENERATE_DRAG_MEMORY_SUMMARY = 'GENERATE_DRAG_MEMORY_SUMMARY',
+  UPDATE_DRAG_MEMORY = 'UPDATE_DRAG_MEMORY',
 }
 
 /**
@@ -60,6 +67,10 @@ export interface ChromeMessage {
     draftsInfo?: string
     isActive?: boolean
     opacity?: number
+    memoryModeEnabled?: boolean
+    memoryId?: string
+    dragMemoryItem?: string
+    dragMemory?: string
   }
 }
 
@@ -70,6 +81,10 @@ export interface ChromeResponse {
   draftsInfo?: string
   success?: boolean
   error?: string
+  isActive?: boolean
+  originalOpacity?: number
+  dragMemory?: string
+  summary?: string
 }
 
 /**
@@ -93,6 +108,27 @@ export interface DragState {
 }
 
 /**
+ * 拖拽记忆项接口
+ */
+export interface DragMemoryItem {
+  id: string
+  selector: string
+  top: number
+  left: number
+  timestamp: number
+  description: string
+}
+
+/**
+ * 拖拽记忆接口
+ */
+export interface DragMemory {
+  items: DragMemoryItem[]
+  url: string
+  lastUpdated: number
+}
+
+/**
  * 应用配置接口
  */
 export interface AppConfig {
@@ -100,6 +136,8 @@ export interface AppConfig {
   defaultDraft: Omit<DraftItem, 'pic'>
   /** 默认模板代码 */
   defaultTemplate: string
+  /** 默认记忆模板代码 */
+  defaultMemoryTemplate: string
   /** 弹窗宽度 */
   popupWidth: number
   /** 最大图片大小（字节） */

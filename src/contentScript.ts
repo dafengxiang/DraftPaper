@@ -4,9 +4,23 @@
  * @date 2024-05-11
  */
 
-import type { DraftsInfo, MessageType, ChromeMessage, ChromeResponse, DragState } from '@/types'
+import type {
+  DraftsInfo,
+  MessageType,
+  ChromeMessage,
+  ChromeResponse,
+  DragState,
+  DragMemory,
+  DragMemoryItem,
+} from '@/types'
 import { CSS_CLASSES, Z_INDEX, APP_CONFIG } from '@/config/constants'
-import { debounce, generateDbKey, copyToClipboard, createErrorHandler } from '@/utils/helpers'
+import {
+  debounce,
+  generateDbKey,
+  generateDragMemoryDbKey,
+  copyToClipboard,
+  createErrorHandler,
+} from '@/utils/helpers'
 import { sanitizeUrl, sanitizeTemplate } from '@/utils/security'
 
 // 错误处理器
@@ -17,6 +31,7 @@ let draftImgDom: HTMLImageElement | null = null
 let draftInfoCache = ''
 let innerWidth = window.innerWidth
 let widthRatio = 1
+let currentDraftWidth = 375 // 默认设计稿宽度
 
 // 拖拽状态
 const dragState: DragState = {
@@ -28,6 +43,10 @@ const dragState: DragState = {
   element: null,
 }
 
+// 当前拖拽开始时的已存在偏移（从 CSS 变量读取）
+let baseVarX = 0
+let baseVarY = 0
+
 // 文档点击监听是否已挂载，防止重复添加导致多次打印
 let isClickListenerAttached = false
 
@@ -36,12 +55,20 @@ let currentTemplateCode = APP_CONFIG.defaultTemplate
 // 当前点击元素的选择器链（清洗后）
 let currentSelectorChain = ''
 
+// 拖拽记忆功能
+let dragMemory: DragMemory = {
+  items: [],
+  url: location.href,
+  lastUpdated: Date.now(),
+}
+
 // 取色器状态
 let isColorPickerActive = false
 let magnifierElement: HTMLDivElement | null = null
 let originalOpacity: number | null = 1 // 保存原始透明度
 let pageScreenshot: string | null = null
 let isScrollLocked = false
+let isMemoryModeEnabled = false
 
 /**
  * 初始化内容脚本
@@ -62,6 +89,11 @@ function initContentScript(): void {
 
     // 请求初始草稿信息
     requestDraftsInfo()
+
+    // 加载拖拽记忆并应用
+    loadDragMemoryFromDB().then(() => {
+      if (isMemoryModeEnabled) applyAllDragMemories()
+    })
   } catch (error) {
     errorHandler(error as Error)
   }
@@ -170,6 +202,133 @@ function registerEventListeners(): void {
           originalOpacity: originalOpacity,
         })
         return true
+      } else if (request.type === 'TOGGLE_MEMORY_MODE') {
+        // 切换记忆模式
+        try {
+          isMemoryModeEnabled = !!request.payload.memoryModeEnabled
+          console.log(`[DraftPaper] 内容脚本记忆模式状态更新: ${isMemoryModeEnabled}`)
+          if (isMemoryModeEnabled) {
+            applyAllDragMemories()
+          } else {
+            // 关闭记忆模式时，移除仅通过变量造成的偏移（不改动页面原有样式）
+            document.querySelectorAll(`.${CSS_CLASSES.dragPosition}`).forEach((el) => {
+              const node = el as HTMLElement
+              node.style.removeProperty('--d-dragX')
+              node.style.removeProperty('--d-dragY')
+              // 保留类名，以保持拖动动画特性，但位移归零
+            })
+          }
+          sendResponse({ success: true })
+        } catch (error) {
+          sendResponse({ success: false, error: (error as Error).message })
+        }
+        return true
+      } else if (request.type === 'GET_DRAG_MEMORY') {
+        // 获取拖拽记忆
+        sendResponse({
+          success: true,
+          dragMemory: JSON.stringify(dragMemory),
+        })
+        return true
+      } else if (request.type === 'ADD_DRAG_MEMORY') {
+        // 添加拖拽记忆
+        try {
+          const memoryItem = JSON.parse(request.payload.dragMemoryItem || '{}')
+          if (!dragMemory.items) {
+            dragMemory.items = []
+          }
+          dragMemory.items.push(memoryItem)
+          dragMemory.lastUpdated = Date.now()
+          saveDragMemoryToDB()
+            .then(() => {
+              sendResponse({ success: true })
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: (error as Error).message })
+            })
+        } catch (error) {
+          sendResponse({ success: false, error: (error as Error).message })
+        }
+        return true
+      } else if (request.type === 'REMOVE_DRAG_MEMORY') {
+        // 删除拖拽记忆
+        try {
+          const memoryId = request.payload.memoryId
+          if (!dragMemory.items) {
+            dragMemory.items = []
+          }
+
+          // 找到要删除的记忆项，恢复其元素位置
+          const itemToRemove = dragMemory.items.find((item) => item.id === memoryId)
+          if (itemToRemove) {
+            const el = document.querySelector(itemToRemove.selector) as HTMLElement | null
+            if (el) {
+              // 恢复元素到初始位置
+              el.style.removeProperty('--d-dragX')
+              el.style.removeProperty('--d-dragY')
+              el.classList.remove(CSS_CLASSES.dragPosition)
+            }
+          }
+
+          dragMemory.items = dragMemory.items.filter((item) => item.id !== memoryId)
+          dragMemory.lastUpdated = Date.now()
+          saveDragMemoryToDB()
+            .then(() => {
+              sendResponse({ success: true })
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: (error as Error).message })
+            })
+        } catch (error) {
+          sendResponse({ success: false, error: (error as Error).message })
+        }
+        return true
+      } else if (request.type === 'CLEAR_DRAG_MEMORY') {
+        // 清空拖拽记忆
+        try {
+          if (!dragMemory.items) {
+            dragMemory.items = []
+          }
+
+          // 恢复所有元素到初始位置
+          dragMemory.items.forEach((item) => {
+            const el = document.querySelector(item.selector) as HTMLElement | null
+            if (el) {
+              // 恢复元素到初始位置
+              el.style.removeProperty('--d-dragX')
+              el.style.removeProperty('--d-dragY')
+              el.classList.remove(CSS_CLASSES.dragPosition)
+            }
+          })
+
+          dragMemory.items = []
+          dragMemory.lastUpdated = Date.now()
+          saveDragMemoryToDB()
+            .then(() => {
+              sendResponse({ success: true })
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: (error as Error).message })
+            })
+        } catch (error) {
+          sendResponse({ success: false, error: (error as Error).message })
+        }
+        return true
+      } else if (request.type === 'GENERATE_DRAG_MEMORY_SUMMARY') {
+        // 生成拖拽记忆汇总
+        try {
+          const summary = generateDragMemorySummary()
+          copyToClipboard(summary)
+            .then((success) => {
+              sendResponse({ success, summary })
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: (error as Error).message })
+            })
+        } catch (error) {
+          sendResponse({ success: false, error: (error as Error).message })
+        }
+        return true
       }
       sendResponse({ success: true })
     } catch (error) {
@@ -234,6 +393,14 @@ function drawDraft(draftInfo: {
 
     // 计算宽度比例
     widthRatio = innerWidth / width
+    currentDraftWidth = width // 保存当前设计稿宽度
+
+    // 在记忆模式下，确保 widthRatio 被正确设置
+    if (isMemoryModeEnabled) {
+      console.log(
+        `[DraftPaper] 设计稿宽度: ${width}px, 屏幕宽度: ${innerWidth}px, 缩放比例: ${widthRatio}`
+      )
+    }
 
     // 移除旧的草稿图片
     if (draftImgDom) {
@@ -289,7 +456,12 @@ function handleElementDrag(isEnabled: boolean): void {
  */
 function clearDragState(): void {
   if (dragState.element) {
-    dragState.element.classList.remove(CSS_CLASSES.dragBorder, CSS_CLASSES.dragPosition)
+    // 在记忆模式下，不移除 dragPosition 类，保持元素位置
+    if (isMemoryModeEnabled) {
+      dragState.element.classList.remove(CSS_CLASSES.dragBorder)
+    } else {
+      dragState.element.classList.remove(CSS_CLASSES.dragBorder, CSS_CLASSES.dragPosition)
+    }
     removeEventListeners(dragState.element)
     dragState.element = null
   }
@@ -305,6 +477,11 @@ function resetDragState(): void {
   dragState.startY = 0
   dragState.currentX = 0
   dragState.currentY = 0
+  // 在记忆模式下，保持 baseVarX/baseVarY 不变，确保元素位置持久化
+  if (!isMemoryModeEnabled) {
+    baseVarX = 0
+    baseVarY = 0
+  }
 }
 
 /**
@@ -324,7 +501,6 @@ function handleElementClick(event: Event): void {
 
     // 打印被点击元素的选择器
     try {
-      const selector = getElementSelector(target)
       const chain = sanitizeSelector(getSelectorChain(target, 6))
       if (chain) {
         // eslint-disable-next-line no-console
@@ -341,6 +517,14 @@ function handleElementClick(event: Event): void {
     // 设置新的拖拽元素
     dragState.element = target
     target.classList.add(CSS_CLASSES.dragBorder, CSS_CLASSES.dragPosition)
+
+    // 在记忆模式下，确保新元素有正确的CSS变量值
+    if (isMemoryModeEnabled) {
+      const existingX = parseFloat(target.style.getPropertyValue('--d-dragX')) || 0
+      const existingY = parseFloat(target.style.getPropertyValue('--d-dragY')) || 0
+      target.style.setProperty('--d-dragX', `${existingX}px`)
+      target.style.setProperty('--d-dragY', `${existingY}px`)
+    }
 
     // 添加触摸事件监听器
     addEventListeners(target)
@@ -375,11 +559,26 @@ function removeEventListeners(element: HTMLElement): void {
  */
 function handleTouchStart(event: TouchEvent): void {
   try {
-    event.preventDefault()
+    // 安全地调用 preventDefault
+    if (event.cancelable) {
+      event.preventDefault()
+    }
     const touch = event.touches[0]
     dragState.isDragging = true
     dragState.startX = touch.clientX
     dragState.startY = touch.clientY
+
+    // 确保拖拽比例正确
+    ensureDragRatio()
+
+    // 读取当前元素的CSS变量偏移作为基础偏移
+    if (dragState.element) {
+      baseVarX = parseFloat(dragState.element.style.getPropertyValue('--d-dragX')) || 0
+      baseVarY = parseFloat(dragState.element.style.getPropertyValue('--d-dragY')) || 0
+    } else {
+      baseVarX = 0
+      baseVarY = 0
+    }
   } catch (error) {
     errorHandler(error as Error)
   }
@@ -400,9 +599,13 @@ function handleTouchMove(event: TouchEvent): void {
     const deltaX = touch.clientX - dragState.startX
     const deltaY = touch.clientY - dragState.startY
 
-    // 更新元素位置
-    dragState.element.style.setProperty('--d-dragX', `${deltaX}px`)
-    dragState.element.style.setProperty('--d-dragY', `${deltaY}px`)
+    // 直接使用拖拽距离，不处理倍数
+    const adjX = deltaX
+    const adjY = deltaY
+
+    // 更新元素位置（基础 + 相对）
+    dragState.element.style.setProperty('--d-dragX', `${baseVarX + adjX}px`)
+    dragState.element.style.setProperty('--d-dragY', `${baseVarY + adjY}px`)
 
     dragState.currentX = touch.clientX
     dragState.currentY = touch.clientY
@@ -427,12 +630,17 @@ async function handleTouchEnd(_event: TouchEvent): Promise<void> {
     // 在复制前刷新最新模板，避免消息不同步导致使用旧模板
     await refreshTemplateFromDB()
 
-    // 计算最终位置
-    const deltaX = Math.round((dragState.currentX - dragState.startX) / widthRatio)
-    const deltaY = Math.round((dragState.currentY - dragState.startY) / widthRatio)
+    // 计算最终位置（相对位移，不处理倍数）
+    const deltaX = dragState.currentX - dragState.startX
+    const deltaY = dragState.currentY - dragState.startY
+    // 总偏移 = 基础偏移 + 本次相对位移
+    const totalX = baseVarX + deltaX
+    const totalY = baseVarY + deltaY
 
-    // 生成代码
-    const code = generatePositionCode(deltaX, deltaY)
+    // 生成代码（在记忆模式下，将像素值除以草稿倍数）
+    const code = isMemoryModeEnabled
+      ? generatePositionCode(deltaX / widthRatio, deltaY / widthRatio)
+      : generatePositionCode(deltaX, deltaY)
 
     // 复制到剪贴板
     const success = await copyToClipboard(code)
@@ -442,6 +650,21 @@ async function handleTouchEnd(_event: TouchEvent): Promise<void> {
       console.info('✅ 模版已复制到剪贴板:', code)
     } else {
       errorHandler(new Error('复制失败'))
+    }
+
+    // 只在记忆模式下保存拖拽记忆
+    console.log(`[DraftPaper] 检查记忆模式状态: ${isMemoryModeEnabled}`)
+    if (isMemoryModeEnabled) {
+      const memoryX = totalX / widthRatio
+      const memoryY = totalY / widthRatio
+      await saveDragMemory(memoryX, memoryY)
+    }
+
+    // 最终应用总偏移到元素样式
+    if (dragState.element) {
+      dragState.element.style.setProperty('--d-dragX', `${totalX}px`)
+      dragState.element.style.setProperty('--d-dragY', `${totalY}px`)
+      dragState.element.classList.add(CSS_CLASSES.dragPosition)
     }
 
     // 重置拖拽状态
@@ -459,14 +682,20 @@ async function handleTouchEnd(_event: TouchEvent): Promise<void> {
  */
 function generatePositionCode(deltaX: number, deltaY: number): string {
   try {
-    const safeTemplate = sanitizeTemplate(currentTemplateCode)
+    // 根据记忆模式选择模板
+    const template = isMemoryModeEnabled ? APP_CONFIG.defaultMemoryTemplate : currentTemplateCode
+    console.log(`[DraftPaper] 生成代码使用模板: ${isMemoryModeEnabled ? '记忆模板' : '普通模板'}`)
+    const safeTemplate = sanitizeTemplate(template)
     return safeTemplate
       .replace(/\{top\}/gi, deltaY.toString())
       .replace(/\{left\}/gi, deltaX.toString())
       .replace(/\{selector\}/gi, currentSelectorChain || '')
   } catch (error) {
     errorHandler(error as Error)
-    return APP_CONFIG.defaultTemplate
+    const fallbackTemplate = isMemoryModeEnabled
+      ? APP_CONFIG.defaultMemoryTemplate
+      : APP_CONFIG.defaultTemplate
+    return fallbackTemplate
       .replace(/\{top\}/gi, deltaY.toString())
       .replace(/\{left\}/gi, deltaX.toString())
       .replace(/\{selector\}/gi, currentSelectorChain || '')
@@ -485,8 +714,12 @@ function getElementSelector(element: Element): string {
 function buildNodeSelector(node: Element): string {
   const tag = node.tagName.toLowerCase()
 
-  // 使用类名（最多两个，避免过长）
-  const classList = Array.from(node.classList).slice(0, 2)
+  // 过滤掉拖拽功能添加的类名
+  const dragClasses = [CSS_CLASSES.dragBorder, CSS_CLASSES.dragPosition]
+  const classList = Array.from(node.classList)
+    .filter((className) => !dragClasses.includes(className as any))
+    .slice(0, 2) // 最多两个，避免过长
+
   if (classList.length) {
     const base = `${tag}.${classList.map((c) => cssEscape(c)).join('.')}`
     const parent = node.parentElement
@@ -533,6 +766,7 @@ function getAncestorSelectors(element: Element, maxDepth = 5): string[] {
 
   while (current && depth < maxDepth && current !== document.body) {
     try {
+      // 为祖先元素也过滤拖拽类名
       const sel = current.id ? `#${cssEscape(current.id)}` : buildNodeSelector(current)
       if (sel) selectors.push(sel)
     } catch (_e) {
@@ -1207,7 +1441,10 @@ function handleColorPickerTouchStart(event: TouchEvent): void {
       return
     }
 
-    event.preventDefault()
+    // 安全地调用 preventDefault
+    if (event.cancelable) {
+      event.preventDefault()
+    }
 
     const touch = event.touches[0]
     if (!touch) {
@@ -1341,7 +1578,10 @@ function handleColorPickerTouchMove(event: TouchEvent): void {
       return
     }
 
-    event.preventDefault()
+    // 安全地调用 preventDefault
+    if (event.cancelable) {
+      event.preventDefault()
+    }
 
     const touch = event.touches[0]
     if (!touch) {
@@ -1374,7 +1614,10 @@ async function handleColorPickerTouchEnd(event: TouchEvent): Promise<void> {
   try {
     if (!isColorPickerActive) return
 
-    event.preventDefault()
+    // 安全地调用 preventDefault
+    if (event.cancelable) {
+      event.preventDefault()
+    }
 
     const touch = event.changedTouches[0]
     if (!touch) return
@@ -1748,6 +1991,319 @@ function showColorNotification(color: string): void {
   } catch (error) {
     errorHandler(error as Error)
   }
+}
+
+/**
+ * 保存拖拽记忆
+ * @param deltaX - X轴偏移
+ * @param deltaY - Y轴偏移
+ */
+async function saveDragMemory(deltaX: number, deltaY: number): Promise<void> {
+  try {
+    if (!currentSelectorChain) {
+      return
+    }
+
+    const memoryItem: DragMemoryItem = {
+      id: generateMemoryId(),
+      selector: currentSelectorChain,
+      top: deltaY,
+      left: deltaX,
+      timestamp: Date.now(),
+      description: getElementDescription(dragState.element),
+    }
+
+    // 检查是否已存在相同的选择器
+    const existingIndex = (dragMemory.items || []).findIndex(
+      (item) => item.selector === currentSelectorChain
+    )
+
+    if (existingIndex >= 0) {
+      // 更新现有项
+      dragMemory.items[existingIndex] = memoryItem
+    } else {
+      // 添加新项
+      if (!dragMemory.items) {
+        dragMemory.items = []
+      }
+      dragMemory.items.push(memoryItem)
+    }
+
+    dragMemory.lastUpdated = Date.now()
+
+    // 保存到数据库
+    await saveDragMemoryToDB()
+
+    // eslint-disable-next-line no-console
+    console.info('✅ 拖拽记忆已保存:', memoryItem)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 将偏移持久应用到元素（使用 CSS 变量 --d-dragX/--d-dragY，并确保类名存在）
+ */
+function applyPersistentOffset(element: HTMLElement, topDelta: number, leftDelta: number): void {
+  try {
+    // 读取已有的变量值，叠加本次增量
+    const prevX = parseFloat(element.style.getPropertyValue('--d-dragX')) || 0
+    const prevY = parseFloat(element.style.getPropertyValue('--d-dragY')) || 0
+    const nextX = prevX + leftDelta
+    const nextY = prevY + topDelta
+
+    element.style.setProperty('--d-dragX', `${nextX}px`)
+    element.style.setProperty('--d-dragY', `${nextY}px`)
+    element.classList.add(CSS_CLASSES.dragPosition)
+  } catch (e) {
+    // 忽略单个元素应用失败，避免影响整体流程
+  }
+}
+
+/**
+ * 确保拖拽比例正确
+ */
+function ensureDragRatio(): void {
+  if (widthRatio === 1 && currentDraftWidth !== 750) {
+    widthRatio = innerWidth / currentDraftWidth
+  }
+
+  // 在记忆模式下，如果没有设计稿宽度信息，使用默认值
+  if (isMemoryModeEnabled && widthRatio === 1) {
+    widthRatio = innerWidth / currentDraftWidth
+    console.log(
+      `[DraftPaper] 记忆模式使用默认设计稿宽度: ${currentDraftWidth}px, 缩放比例: ${widthRatio}`
+    )
+  }
+
+  // 确保在记忆模式下，widthRatio 不为 1（除非屏幕宽度确实等于设计稿宽度）
+  if (isMemoryModeEnabled && widthRatio === 1 && innerWidth !== currentDraftWidth) {
+    widthRatio = innerWidth / currentDraftWidth
+    console.log(`[DraftPaper] 记忆模式强制更新缩放比例: ${widthRatio}`)
+  }
+}
+
+/**
+ * 将已保存的记忆批量应用到页面
+ */
+function applyAllDragMemories(): void {
+  try {
+    if (!dragMemory.items || dragMemory.items.length === 0) return
+    dragMemory.items.forEach((item) => {
+      const el = document.querySelector(item.selector) as HTMLElement | null
+      if (el) {
+        // 在记忆模式下，需要将保存的值乘以widthRatio来应用到元素
+        const appliedX = isMemoryModeEnabled ? item.left * widthRatio : item.left
+        const appliedY = isMemoryModeEnabled ? item.top * widthRatio : item.top
+        el.style.setProperty('--d-dragX', `${appliedX}px`)
+        el.style.setProperty('--d-dragY', `${appliedY}px`)
+        el.classList.add(CSS_CLASSES.dragPosition)
+      }
+    })
+  } catch {
+    // no-op
+  }
+}
+
+/**
+ * 生成记忆项ID
+ */
+function generateMemoryId(): string {
+  return `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * 获取元素描述
+ * @param element - 目标元素
+ */
+function getElementDescription(element: HTMLElement | null): string {
+  if (!element) return ''
+
+  try {
+    const tagName = element.tagName.toLowerCase()
+    const className = element.className ? `.${element.className.split(' ').join('.')}` : ''
+    const id = element.id ? `#${element.id}` : ''
+    const text = element.textContent?.trim().substring(0, 20) || ''
+
+    return `${tagName}${id}${className}${text ? ` (${text}...)` : ''}`
+  } catch {
+    return element.tagName.toLowerCase()
+  }
+}
+
+/**
+ * 保存拖拽记忆到数据库
+ */
+async function saveDragMemoryToDB(): Promise<void> {
+  try {
+    const dbKey = generateDragMemoryDbKey(new URL(location.href))
+    const message: ChromeMessage = {
+      type: 'UPDATE_DRAG_MEMORY' as MessageType,
+      payload: {
+        dbKey,
+        dragMemory: JSON.stringify(dragMemory),
+      },
+    }
+
+    // 添加重试机制
+    const maxRetries = 3
+    let retryCount = 0
+
+    const attemptSave = (): void => {
+      chrome.runtime.sendMessage(message, (response: ChromeResponse) => {
+        if (chrome.runtime.lastError) {
+          const errorMsg = chrome.runtime.lastError.message
+          console.warn(
+            `[DraftPaper] 保存拖拽记忆失败 (尝试 ${retryCount + 1}/${maxRetries}):`,
+            errorMsg
+          )
+
+          // 如果是连接错误且还有重试次数，则重试
+          if (
+            retryCount < maxRetries - 1 &&
+            errorMsg &&
+            (errorMsg.includes('Could not establish connection') ||
+              errorMsg.includes('Receiving end does not exist'))
+          ) {
+            retryCount++
+            setTimeout(attemptSave, 1000 * retryCount) // 递增延迟
+            return
+          }
+
+          console.error('[DraftPaper] 拖拽记忆保存最终失败')
+        } else if (response?.success) {
+          console.log('[DraftPaper] 拖拽记忆保存成功')
+        } else {
+          console.warn('[DraftPaper] 拖拽记忆保存响应异常:', response)
+        }
+      })
+    }
+
+    attemptSave()
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 从数据库加载拖拽记忆
+ */
+async function loadDragMemoryFromDB(): Promise<void> {
+  try {
+    const dbKey = generateDragMemoryDbKey(new URL(location.href))
+    const message: ChromeMessage = {
+      type: 'GET_DRAG_MEMORY' as MessageType,
+      payload: { dbKey },
+    }
+
+    // 添加重试机制
+    const maxRetries = 3
+    let retryCount = 0
+
+    const attemptLoad = (): void => {
+      chrome.runtime.sendMessage(message, (response: ChromeResponse) => {
+        if (chrome.runtime.lastError) {
+          const errorMsg = chrome.runtime.lastError.message
+          console.warn(
+            `[DraftPaper] 加载拖拽记忆失败 (尝试 ${retryCount + 1}/${maxRetries}):`,
+            errorMsg
+          )
+
+          // 如果是连接错误且还有重试次数，则重试
+          if (
+            retryCount < maxRetries - 1 &&
+            errorMsg &&
+            (errorMsg.includes('Could not establish connection') ||
+              errorMsg.includes('Receiving end does not exist'))
+          ) {
+            retryCount++
+            setTimeout(attemptLoad, 1000 * retryCount) // 递增延迟
+            return
+          }
+
+          // 最终失败，使用默认值
+          dragMemory = {
+            items: [],
+            url: location.href,
+            lastUpdated: Date.now(),
+          }
+        } else if (response?.dragMemory) {
+          try {
+            const parsedMemory = JSON.parse(response.dragMemory)
+            dragMemory = {
+              items: parsedMemory.items || [],
+              url: parsedMemory.url || location.href,
+              lastUpdated: parsedMemory.lastUpdated || Date.now(),
+            }
+            console.log('[DraftPaper] 拖拽记忆加载成功:', dragMemory.items.length, '项')
+          } catch (parseError) {
+            console.warn('[DraftPaper] 解析拖拽记忆失败:', parseError)
+            // 重置为默认值
+            dragMemory = {
+              items: [],
+              url: location.href,
+              lastUpdated: Date.now(),
+            }
+          }
+        } else {
+          // 没有数据，使用默认值
+          dragMemory = {
+            items: [],
+            url: location.href,
+            lastUpdated: Date.now(),
+          }
+        }
+      })
+    }
+
+    attemptLoad()
+  } catch (error) {
+    errorHandler(error as Error)
+    // 发生错误时使用默认值
+    dragMemory = {
+      items: [],
+      url: location.href,
+      lastUpdated: Date.now(),
+    }
+  }
+}
+
+/**
+ * 生成拖拽记忆汇总代码
+ */
+function generateDragMemorySummary(): string {
+  if (!dragMemory.items || dragMemory.items.length === 0) {
+    return '// 暂无拖拽记忆'
+  }
+
+  let summary = '// 拖拽记忆汇总\n'
+  summary += `// 页面: ${dragMemory.url}\n`
+  summary += `// 共 ${dragMemory.items.length} 个元素\n\n`
+
+  dragMemory.items.forEach((item, index) => {
+    summary += `// ${index + 1}. ${item.description || item.selector}\n`
+    summary += `${item.selector} {\n`
+    summary += `  /* 拖拽偏移: top: ${item.top}px, left: ${item.left}px */\n`
+
+    // 根据元素的定位方式生成不同的CSS
+    const element = document.querySelector(item.selector) as HTMLElement
+    if (element) {
+      const computedStyle = window.getComputedStyle(element)
+      const position = computedStyle.position
+
+      if (position === 'static') {
+        summary += `  margin-top: ${item.top}px;\n`
+        summary += `  margin-left: ${item.left}px;\n`
+      } else {
+        summary += `  top: ${item.top}px;\n`
+        summary += `  left: ${item.left}px;\n`
+      }
+    }
+
+    summary += `}\n\n`
+  })
+
+  return summary
 }
 
 // 立即执行函数，避免全局污染

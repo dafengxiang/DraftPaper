@@ -5,7 +5,7 @@
  */
 
 import type { ChromeMessage, ChromeResponse, MessageType } from '@/types'
-import { openDB, getDataByKey } from '@/utils/database'
+import { openDB, getDataByKey, updateDB } from '@/utils/database'
 import { createErrorHandler } from '@/utils/helpers'
 
 const errorHandler = createErrorHandler('Background')
@@ -64,6 +64,69 @@ function handleUrlChange(
   }
 }
 
+/**
+ * 处理获取拖拽记忆请求
+ * @param request - 请求消息
+ * @param sendResponse - 响应函数
+ */
+async function handleGetDragMemory(
+  request: ChromeMessage,
+  sendResponse: (response: ChromeResponse) => void
+): Promise<void> {
+  try {
+    await openDB(true)
+    const data = await getDataByKey(request.payload.dbKey)
+    const dragMemory = data?.val || '{"items":[],"url":"","lastUpdated":0}'
+
+    sendResponse({
+      dragMemory,
+      success: true,
+    })
+  } catch (error) {
+    errorHandler(error as Error)
+    sendResponse({
+      success: false,
+      error: (error as Error).message,
+    })
+  }
+}
+
+/**
+ * 处理更新拖拽记忆请求
+ * @param request - 请求消息
+ * @param sendResponse - 响应函数
+ */
+async function handleUpdateDragMemory(
+  request: ChromeMessage,
+  sendResponse: (response: ChromeResponse) => void
+): Promise<void> {
+  try {
+    await openDB(true)
+
+    if (request.payload.dbKey && request.payload.dragMemory) {
+      await updateDB({
+        url_path: request.payload.dbKey,
+        val: request.payload.dragMemory,
+      })
+
+      sendResponse({
+        success: true,
+      })
+    } else {
+      sendResponse({
+        success: false,
+        error: 'Missing required parameters',
+      })
+    }
+  } catch (error) {
+    errorHandler(error as Error)
+    sendResponse({
+      success: false,
+      error: (error as Error).message,
+    })
+  }
+}
+
 // 监听消息
 chrome.runtime.onMessage.addListener((request: ChromeMessage, _sender, sendResponse) => {
   try {
@@ -76,6 +139,14 @@ chrome.runtime.onMessage.addListener((request: ChromeMessage, _sender, sendRespo
 
       case 'URL_CHANGE' as MessageType:
         handleUrlChange(request, sendResponse)
+        break
+
+      case 'GET_DRAG_MEMORY' as MessageType:
+        handleGetDragMemory(request, sendResponse)
+        break
+
+      case 'UPDATE_DRAG_MEMORY' as MessageType:
+        handleUpdateDragMemory(request, sendResponse)
         break
 
       default:

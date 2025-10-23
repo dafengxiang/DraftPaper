@@ -190,6 +190,7 @@ function createDefaultDraftsInfo(): DraftsInfo {
  */
 function validateDraftsInfo(data: unknown): data is DraftsInfo {
   if (!data || typeof data !== 'object') {
+    console.log('[useDrafts] 数据验证失败: 数据为空或不是对象', data)
     return false
   }
 
@@ -207,12 +208,21 @@ function validateDraftsInfo(data: unknown): data is DraftsInfo {
     typeof templateCode !== 'string' ||
     !Array.isArray(list)
   ) {
+    console.log('[useDrafts] 数据验证失败: 必要字段类型错误', {
+      selectedIdx: typeof selectedIdx,
+      isCanPick: typeof isCanPick,
+      templateCode: typeof templateCode,
+      list: Array.isArray(list) ? 'array' : typeof list,
+      actualValues: { selectedIdx, isCanPick, templateCode, list },
+    })
     return false
   }
 
   // 检查列表中的每个项目
-  for (const item of list) {
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i]
     if (!item || typeof item !== 'object') {
+      console.log(`[useDrafts] 数据验证失败: 列表项${i}不是对象`, item)
       return false
     }
 
@@ -231,9 +241,18 @@ function validateDraftsInfo(data: unknown): data is DraftsInfo {
       typeof draftItem.left !== 'number' ||
       typeof draftItem.opacity !== 'number'
     ) {
+      console.log(`[useDrafts] 数据验证失败: 列表项${i}字段类型错误`, {
+        pic: typeof draftItem.pic,
+        width: typeof draftItem.width,
+        top: typeof draftItem.top,
+        left: typeof draftItem.left,
+        opacity: typeof draftItem.opacity,
+        actualValues: draftItem,
+      })
       return false
     }
   }
 
+  console.log('[useDrafts] 数据验证成功')
   return true
 }

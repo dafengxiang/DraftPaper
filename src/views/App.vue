@@ -31,6 +31,10 @@
           :title="isSetting ? '退出设置' : '打开设置'"
           @click="isSetting = !isSetting"
         ></button>
+        <label class="memory-toggle">
+          <input type="checkbox" v-model="isMemoryMode" @change="toggleMemoryMode" />
+          记忆
+        </label>
       </div>
     </header>
 
@@ -53,6 +57,8 @@
       <template v-else>
         <!-- 草稿列表 -->
         <DraftList />
+        <!-- 拖拽记忆列表 -->
+        <DragMemoryList v-if="isMemoryMode" />
         <!-- 控制面板 -->
         <ControlBox :is-color-picker-active="isColorPickerActive" />
       </template>
@@ -71,6 +77,7 @@ import { DEBOUNCE_DELAY } from '@/config/constants'
 import DraftList from './DraftList.vue'
 import ControlBox from './ControlBox.vue'
 import SettingBox from './SettingBox.vue'
+import DragMemoryList from './DragMemoryList.vue'
 
 const errorHandler = createErrorHandler('App')
 
@@ -79,6 +86,8 @@ const isSetting = ref(false)
 const isLoading = ref(true)
 const errorMessage = ref('')
 const isColorPickerActive = ref(false)
+// 从本地存储加载记忆模式状态，默认为false
+const isMemoryMode = ref(JSON.parse(localStorage.getItem('draftPaper_memoryMode') || 'false'))
 
 // 草稿数据管理
 const { draftsInfo, initDrafts, updateDraftsDB } = useDrafts()
@@ -242,6 +251,14 @@ const initializeApp = async (): Promise<void> => {
       console.log('[DraftPaper] Color picker state sync failed during init (non-critical):', error)
     })
 
+    // 同步记忆模式状态（非关键操作，失败不影响应用启动）
+    // 延迟一点时间确保内容脚本已加载
+    setTimeout(() => {
+      syncMemoryModeState().catch((error) => {
+        console.log('[DraftPaper] Memory mode state sync failed during init (non-critical):', error)
+      })
+    }, 100)
+
     isLoading.value = false
   } catch (error) {
     errorHandler(error as Error)
@@ -348,6 +365,60 @@ const toggleColorPicker = async (): Promise<void> => {
     isColorPickerActive.value = false
   }
 }
+
+/**
+ * 切换记忆模式
+ */
+async function toggleMemoryMode(): Promise<void> {
+  try {
+    if (!window.$currentTab?.id) return
+    const message = {
+      type: 'TOGGLE_MEMORY_MODE' as const,
+      payload: { memoryModeEnabled: isMemoryMode.value },
+    }
+    chrome.tabs.sendMessage(window.$currentTab.id, message, (_response) => {})
+    console.log(`[DraftPaper] 记忆模式${isMemoryMode.value ? '开启' : '关闭'}`)
+  } catch (error) {
+    errorHandler(error as Error)
+  }
+}
+
+/**
+ * 同步记忆模式状态
+ */
+async function syncMemoryModeState(): Promise<void> {
+  try {
+    if (!window.$currentTab?.id) {
+      console.log('[DraftPaper] 无法获取当前标签页ID，跳过同步')
+      return
+    }
+    const message = {
+      type: 'TOGGLE_MEMORY_MODE' as const,
+      payload: { memoryModeEnabled: isMemoryMode.value },
+    }
+    console.log(`[DraftPaper] 发送同步消息:`, message)
+    chrome.tabs.sendMessage(window.$currentTab.id, message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('[DraftPaper] 同步消息发送失败:', chrome.runtime.lastError.message)
+      } else {
+        console.log('[DraftPaper] 同步消息发送成功:', response)
+      }
+    })
+    console.log(`[DraftPaper] 同步记忆模式状态: ${isMemoryMode.value ? '开启' : '关闭'}`)
+  } catch (error) {
+    console.log('[DraftPaper] 同步记忆模式状态失败:', error)
+  }
+}
+
+// 监听记忆模式状态变化，保存到本地存储
+watch(isMemoryMode, (newValue) => {
+  try {
+    localStorage.setItem('draftPaper_memoryMode', JSON.stringify(newValue))
+    console.log(`[DraftPaper] 记忆模式状态已保存: ${newValue}`)
+  } catch (error) {
+    console.error('[DraftPaper] 保存记忆模式状态失败:', error)
+  }
+})
 
 // 监听草稿信息变化
 watch(draftsInfo, handleDatabaseUpdate, { deep: true })

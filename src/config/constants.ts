@@ -10,7 +10,14 @@ export const APP_CONFIG: AppConfig = {
     left: 0,
     opacity: 1,
   },
-  defaultTemplate: 'position: absolute; top: {top}px; left: {left}px;',
+  defaultTemplate: `position: absolute; top: {top}px; left: {left}px;`,
+  defaultMemoryTemplate: `你是一位负责页面样式修正的前端专家。
+请对以下元素进行修改：
+{memoryList}
+规则：
+1. 严格基于该元素当前定位方式（不改动定位属性）；
+2. relative/absolute/fixed/sticky：叠加/新增top/left；static：仅调margin-top/margin-left；
+3. 不碰无关样式，输出含{selector}的完整CSS。`,
   popupWidth: 350,
   maxImageSize: 5 * 1024 * 1024, // 5MB
   supportedImageTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
